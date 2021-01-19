@@ -8,9 +8,9 @@
 
 // Pin declaration 
 const int ST_EN=13, ST1=33, ST2=14, TH1=27, TH2=26, TH_EN=12;
-const int freq = 5000;
+//const int freq = 5000;
 const int TH_Channel = 0, ST_Channel = 2;
-const int resolution = 8;
+//const int resolution = 8;
 
 int LED_BUILTIN = 26;
 int THROTTLE_OUT = 25;
