@@ -9,13 +9,13 @@ The VCU handles the following tasks :
 3. Data logging, wireless live logging, Remote Emergency Shutdown, etc. 
 
 Libraries used :
-1. ("Wire.h")[https://www.arduino.cc/en/reference/wire]
-2. ("I2Cdev.h")[http://github.com/jrowberg/i2cdevlib]
-3. ("./DS1307.h")[]
-4. ("./MPU6050.h")[]
-5. ("FS.h")[https://github.com/espressif/arduino-esp32/blob/master/libraries/FS/src/FS.h]
-6. ("SD.h")[https://github.com/espressif/arduino-esp32/blob/master/libraries/SD/src/SD.h]
-7. ("SPI.h")[https://github.com/espressif/arduino-esp32/tree/master/libraries/SPI]
+1. ["Wire.h"](https://www.arduino.cc/en/reference/wire)
+2. ["I2Cdev.h"](http://github.com/jrowberg/i2cdevlib)
+3. ["./DS1307.h"]()
+4. ["./MPU6050.h"]()
+5. ["FS.h"](https://github.com/espressif/arduino-esp32/blob/master/libraries/FS/src/FS.h)
+6. ["SD.h"](https://github.com/espressif/arduino-esp32/blob/master/libraries/SD/src/SD.h)
+7. ["SPI.h"](https://github.com/espressif/arduino-esp32/tree/master/libraries/SPI)
 
 ## TODO
 1. Data logging with dates
