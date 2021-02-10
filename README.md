@@ -8,14 +8,18 @@ The VCU handles the following tasks :
 2. Generating appropriate throttle signal, RTDS, dispaly data, APPS plausibility check, work on shutdown circuit
 3. Data logging, wireless live logging, Remote Emergency Shutdown, etc. 
 
-Libraries used :
-1. ["Wire.h"](https://www.arduino.cc/en/reference/wire)
-2. ["I2Cdev.h"](http://github.com/jrowberg/i2cdevlib)
-3. ["./DS1307.h"]()
-4. ["./MPU6050.h"]()
-5. ["FS.h"](https://github.com/espressif/arduino-esp32/blob/master/libraries/FS/src/FS.h)
-6. ["SD.h"](https://github.com/espressif/arduino-esp32/blob/master/libraries/SD/src/SD.h)
-7. ["SPI.h"](https://github.com/espressif/arduino-esp32/tree/master/libraries/SPI)
+## Libraries used :
+
+- ["ESP32CAN.h"](https://www.arduino.cc/reference/en/libraries/can/)
+- ["Wire.h"](https://www.arduino.cc/en/reference/wire)
+- ["I2Cdev.h"](http://github.com/jrowberg/i2cdevlib)
+- ["./DS1307.h"](https://github.com/jrowberg/i2cdevlib/tree/master/Arduino/DS1307)
+- ["./MPU6050.h"](https://github.com/jrowberg/i2cdevlib/tree/master/Arduino/MPU6050)
+- ["FS.h"](https://github.com/espressif/arduino-esp32/blob/master/libraries/FS/src/FS.h)
+- ["SD.h"](https://github.com/espressif/arduino-esp32/blob/master/libraries/SD/src/SD.h)
+- ["SPI.h"](https://github.com/espressif/arduino-esp32/tree/master/libraries/SPI)
+
+Refer to [AdityaNG/VRE_CAN](https://github.com/AdityaNG/VRE_CAN) for CAN Data logger implementation.
 
 ## TODO
 1. Data logging with dates
