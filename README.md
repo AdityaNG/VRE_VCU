@@ -1,6 +1,6 @@
 # VRE_VCU
 
-![Board](img/board.png)
+![Board](img/board.jpg)
 
 The VCU handles the following tasks : 
 
