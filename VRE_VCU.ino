@@ -93,24 +93,37 @@ void log_sensor_names() {
 
 }
 
+
+void log_current_frame_serial() {
+  for (int i=0; i<DIRECT_SENSORS_SIZE; i++) {
+    //Serial.print(DIRECT_SENSORS_NAMES[i] + ": " + String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)) + ", ");
+  }
+
+  for (int i=0; i<SENSORS_SIZE; i++) {
+    Serial.print(SENSORS_NAMES[i] + ": " + String(*SENSORS[i]) + ", ");
+  }
+  Serial.println();
+}
+
 void log_current_frame() {
-  if (!SD_available)
-    return;
-  
   for (int i=0; i<DIRECT_SENSORS_SIZE; i++) {
     appendFile(SD, NEW_LOG_FILE.c_str(), String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)).c_str());
     appendFile(SD, NEW_LOG_FILE.c_str(), ",");
+    //Serial.print(DIRECT_SENSORS_NAMES[i] + ": " + String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)) + ", ");
   }
 
   for (int i=0; i<SENSORS_SIZE; i++) {
     appendFile(SD, NEW_LOG_FILE.c_str(), String(*SENSORS[i]).c_str());
     appendFile(SD, NEW_LOG_FILE.c_str(), ",");
+    //Serial.print(SENSORS_NAMES[i] + ": " + String(*SENSORS[i]) + ", ");
   }
   appendFile(SD, NEW_LOG_FILE.c_str(), "\n");
+  //Serial.println();
 }
 
 // Files
 bool dirExists(fs::FS &fs, const char * dirname) {
+  if (!SD_available) return false;
   //Serial.printf("Listing directory: %s\n", dirname);
 
     File root = fs.open("/");
@@ -136,6 +149,7 @@ bool dirExists(fs::FS &fs, const char * dirname) {
 }
 
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
+  if (!SD_available) return;
     Serial.printf("Listing directory: %s\n", dirname);
 
     File root = fs.open(dirname);
@@ -173,6 +187,7 @@ void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
 }
 
 void createDir(fs::FS &fs, const char * path){
+  if (!SD_available) return;
     Serial.printf("Creating Dir: %s\n", path);
     if(fs.mkdir(path)){
         Serial.println("Dir created");
@@ -182,6 +197,7 @@ void createDir(fs::FS &fs, const char * path){
 }
 
 void removeDir(fs::FS &fs, const char * path){
+  if (!SD_available) return;
     Serial.printf("Removing Dir: %s\n", path);
     if(fs.rmdir(path)){
         Serial.println("Dir removed");
@@ -191,6 +207,7 @@ void removeDir(fs::FS &fs, const char * path){
 }
 
 void readFile(fs::FS &fs, const char * path){
+  if (!SD_available) return;
     Serial.printf("Reading file: %s\n", path);
 
     File file = fs.open(path);
@@ -207,6 +224,7 @@ void readFile(fs::FS &fs, const char * path){
 }
 
 void writeFile(fs::FS &fs, const char * path, const char * message){
+  if (!SD_available) return;
     Serial.printf("Writing file: %s\n", path);
 
     File file = fs.open(path, FILE_WRITE);
@@ -223,6 +241,7 @@ void writeFile(fs::FS &fs, const char * path, const char * message){
 }
 
 void appendFile(fs::FS &fs, const char * path, const char * message){
+  if (!SD_available) return;
     //Serial.printf("Appending to file: %s\n", path);
 
     File file = fs.open(path, FILE_APPEND);
@@ -267,7 +286,7 @@ void get_MPU_values() {
   accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);  
   // 1788 -512  15148 -263  212 -183 - Offsets
   ax-=-1788; ay-=-512; az-=15148; gx-=-263; gy-=212; gz-=-183;
-  
+  /*
   Serial.print("a/g:\t");
         Serial.print(ax); Serial.print("\t");
         Serial.print(ay); Serial.print("\t");
@@ -275,6 +294,7 @@ void get_MPU_values() {
         Serial.print(gx); Serial.print("\t");
         Serial.print(gy); Serial.print("\t");
         Serial.println(gz);
+  */
         
 }
 // Gyro end
@@ -302,7 +322,8 @@ void get_RTC_TIME() {
   if (minutes < 10) TIME+="0";
   TIME+= minutes+":";
   if (seconds < 10) TIME+="0";
-  TIME+= seconds;*/
+  TIME+= seconds;
+  */
 }
 
 void print_time() {
@@ -389,6 +410,7 @@ const int rx_queue_size = 10;       // Receive Queue size
 
 String FAULTS[8] = {"Weak Cell", "Low Cell Voltage", "Weak Cell", "Open Cell Voltage", "Weak Pack", "Thermistor", "High Voltage Isolation", "Internal Logic Fault"};
 String SIGNAL[5] = {"Ready Power Signal", "Charge Power Signal", "Depleted", "Balancing Active", "12V Power Supply Fault"};
+String FAULT_MESSAGE = "";
 const int FLT = 1, MSG = 2;
 
 String get_message(byte a, int typ) {
@@ -460,14 +482,21 @@ void CAN_loop() {
         SOC = data[6];
         DOD = data[7];
         res = "0x0A|| current : " + String(current) + " | " + "volt : " + String(volt) + " | " + "volt_12 : " + String(volt_12) + " | " + "SOC : " + String(SOC) + " | " + "DOD : " + String(DOD) + " | ";
-        if (data[4]!=0) { // CRITICAL
-          fault = true;
-          res+=get_message(data[4], FLT) +" | ";
+        if (data[4]==0 && data[5]==0) {
+          FAULT_MESSAGE = "";
+        } else {
+          FAULT_MESSAGE = "";
+          if (data[4]!=0) { // CRITICAL
+            fault = true;
+            res+=get_message(data[4], FLT) +" | ";
+            FAULT_MESSAGE += "FAULT : { " + get_message(data[4], FLT) + " }, ";
+          }
+          if (data[5]!=0) { // NON CRITICAL
+            res+=get_message(data[5], MSG) +" | ";
+            FAULT_MESSAGE += "MESSAGE : { " + get_message(data[5], MSG) + " } ";;
+          }
         }
-        if (data[5]!=0) { // NON CRITICAL
-          res+=get_message(data[5], MSG) +" | ";
-        }
-        printf("0x0A|| current - %f | volt : %f | volt_12 : %f | SOC : %f | DOD : %f \n", current, volt, volt_12, SOC, DOD);
+        //printf("0x0A|| current - %f | volt : %f | volt_12 : %f | SOC : %f | DOD : %f \n", current, volt, volt_12, SOC, DOD);
     } else if (ID==0x0B) {
         resistance = data[0] / 1000.0; //Divide by 1000 
         health = data[1];
@@ -476,14 +505,14 @@ void CAN_loop() {
         low_volt_id = data[6];
         high_volt_id = data[7];
         res = "0x0B|| resistance : " + String(resistance) + " | " + "health : " + String(health) + " | " + "summed_volt : " + String(summed_volt) + " | " + "avg_temp : " + String(avg_temp) + " | " + "low_volt_id : " + String(low_volt_id) + " | " + "high_volt_id : " + String(high_volt_id) + " | ";
-        printf("0x0A|| resistance - %f | health : %f | summed_volt : %f | avg_temp : %f | low_volt_id : %f | high_volt_id : %f \n", resistance, health, summed_volt, avg_temp, low_volt_id, high_volt_id);
+        //printf("0x0B|| resistance - %f | health : %f | summed_volt : %f | avg_temp : %f | low_volt_id : %f | high_volt_id : %f \n", resistance, health, summed_volt, avg_temp, low_volt_id, high_volt_id);
     } else if (ID==0x0C) {
         
         amp_hrs = ((data[0] * B10000000 *2)  + data[1] )/10.0; // /10
         CCL = (data[2] * B10000000 *2) + data[3]; // V
         DCL = (data[4] * B10000000 *2) + data[5]; // V
         res = "0x0C|| amp_hrs : " + String(amp_hrs) + " | " + "CCL : " + String(CCL) + " | " + "DCL : " + String(DCL) + " | ";
-        printf("0x0C|| amp_hrs - %f | CCL : %f | DCL : %f \n", amp_hrs, CCL, DCL);
+        //printf("0x0C|| amp_hrs - %f | CCL : %f | DCL : %f \n", amp_hrs, CCL, DCL);
     } else if (ID==0x0D) {
       
       pack_id = (int)data[0];
@@ -601,12 +630,23 @@ void setup() {
 }
 
 int started = false;
-
+int last_log_print = 0;
+String LAST_FAULT_MESSAGE = "";
 void loop() {
-
-  delay(1000);
+  
+  //delay(1000);
 
   log_current_frame();
+  
+  if (millis() - last_log_print >= 5000) {
+    log_current_frame_serial();
+    last_log_print = millis();
+  }
+
+  if (LAST_FAULT_MESSAGE != FAULT_MESSAGE) {
+    LAST_FAULT_MESSAGE = FAULT_MESSAGE;
+    Serial.println("[CAN] " + FAULT_MESSAGE);
+  }
   
   get_RTC_TIME();
   //print_time();

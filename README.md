@@ -1,6 +1,6 @@
 # VRE_VCU
 
-![Banner](img/schem1.png)
+![Board](img/board.png)
 
 The VCU handles the following tasks : 
 
@@ -20,6 +20,8 @@ The VCU handles the following tasks :
 - ["SPI.h"](https://github.com/espressif/arduino-esp32/tree/master/libraries/SPI)
 
 Refer to [AdityaNG/VRE_CAN](https://github.com/AdityaNG/VRE_CAN) for CAN Data logger implementation.
+
+![Banner](img/schem1.png)
 
 ## TODO
 1. Data logging with dates
