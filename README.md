@@ -28,3 +28,12 @@ Refer to [AdityaNG/VRE_CAN](https://github.com/AdityaNG/VRE_CAN) for CAN Data lo
 2. Wireless live data logging
 3. Brake Pressure, Wheel Speed, Start button
 4. RTDS, APPS check, Shutdown line
+5. MPU Connection hang bug (system waits forever to connect to MPU)
+6. SD card consistency issue
+7. PCB - level shifter shape and pinout
+8. PCB - Power connector is to be reversed
+9. PCB - SD Card Mount Orientation
+10. PCB - Add shutdown relays
+11. PCB - Add BSPD daughter board
+12. PCB - ESP doesn't accept code when plugged into PCB [sometimes]
+13. PCB - RTC and MPU are too close to each other

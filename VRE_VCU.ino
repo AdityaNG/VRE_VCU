@@ -467,6 +467,8 @@ void CAN_loop() {
       }
       //printf("\n");
     }
+
+  if ( rx_frame.FIR.B.DLC < 1 ) return;
   
     uint32_t ID = rx_frame.MsgID;
     byte *data = (byte*) malloc(rx_frame.FIR.B.DLC * sizeof(byte));
@@ -525,7 +527,6 @@ void CAN_loop() {
     }
 
     //printf("%s\n", res);
-
     free(data);
   }
 }
