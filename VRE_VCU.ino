@@ -555,6 +555,35 @@ void CAN_loop() {
 }
 
 /// CAN Logging Implementation END
+const int SHUTDOWN_RELAY = 35;
+void emergency_stop() {
+  digitalWrite(SHUTDOWN_RELAY, LOW);
+}
+
+void startup_TS() {
+  digitalWrite(SHUTDOWN_RELAY, HIGH);
+}
+
+void ESP_BT_Commands() {
+  if (ESP_BT.available()) //Check if we receive anything from Bluetooth
+  {
+    char incoming = ESP_BT.read(); //Read what we recevive
+    Serial.print("Received:"); Serial.println(incoming);
+    ESP_BT.print("Received:"); ESP_BT.println(incoming);
+    switch (incoming) {
+      case 's':
+        Serial.println("Remote shutdown triggered");
+        ESP_BT.println("Remote shutdown triggered");
+        emergency_stop();
+        break;  
+      case 'g':
+        Serial.println("Remote startup triggered");
+        ESP_BT.println("Remote startup triggered");
+        emergency_stop();
+        break;  
+    }
+  }
+}
 
 void setup() {
   // initialize serial communication
@@ -582,6 +611,7 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BRAKE_LIGHTS, OUTPUT);
 
+
   pinMode(LED_FAULT, OUTPUT);
   digitalWrite(LED_FAULT, LOW);
   pinMode(BUZZER, OUTPUT);
@@ -601,6 +631,9 @@ void setup() {
   ledcAttachPin(THROTTLE_OUT, ledChannel);
   ledcAttachPin(LED_BUILTIN, ledChannel);
   ledcAttachPin(BRAKE_LIGHTS, brakeChannel);
+
+  pinMode(SHUTDOWN_RELAY, OUTPUT);
+  startup_TS();
 
   CAN_setup();
 
@@ -695,6 +728,8 @@ void loop() {
   get_MPU_values();
 
   CAN_loop();
+
+  ESP_BT_Commands();
 
   int brakes = analogRead(BPS);
   brakes = map(brakes, 0, 4095, 0, 255);
