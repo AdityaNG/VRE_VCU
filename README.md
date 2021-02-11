@@ -35,5 +35,16 @@ Refer to [AdityaNG/VRE_CAN](https://github.com/AdityaNG/VRE_CAN) for CAN Data lo
 9. PCB - SD Card Mount Orientation
 10. PCB - Add shutdown relays
 11. PCB - Add BSPD daughter board
-12. PCB - ESP doesn't accept code when plugged into PCB [sometimes]
+12. PCB - ESP32 [Look at Strapping Pins] Error message - :A fatal error occurred: MD5 of file does not match data in flash!" - Disconnecting pin 12 from the level shifter fixed this
 13. PCB - RTC and MPU are too close to each other
+
+## Strapping Pins
+
+The ESP32 chip has the following strapping pins:
+
+- GPIO 0
+- GPIO 2
+- GPIO 4
+- GPIO 5 (must be HIGH during boot)
+- GPIO 12 (must be LOW during boot)
+- GPIO 15 (must be HIGH during boot)

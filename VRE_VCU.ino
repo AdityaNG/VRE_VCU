@@ -10,6 +10,10 @@
 #include <ESP32CAN.h>
 #include <CAN_config.h>
 
+#include "BluetoothSerial.h"
+
+BluetoothSerial ESP_BT; 
+
 // Pin declaration 
 const int ST_EN=13, ST1=33, ST2=14, TH1=27, TH2=26, TH_EN=12;
 //const int freq = 5000;
@@ -101,8 +105,10 @@ void log_current_frame_serial() {
 
   for (int i=0; i<SENSORS_SIZE; i++) {
     Serial.print(SENSORS_NAMES[i] + ": " + String(*SENSORS[i]) + ", ");
+    ESP_BT.print(SENSORS_NAMES[i] + ": " + String(*SENSORS[i]) + ", ");
   }
   Serial.println();
+  ESP_BT.println();
 }
 
 void log_current_frame() {
@@ -327,7 +333,7 @@ void get_RTC_TIME() {
 }
 
 void print_time() {
-  Serial.print("rtc:\t");
+  //Serial.print("rtc:\t");
   Serial.print(year); Serial.print("-");
   if (month < 10) Serial.print("0");
   Serial.print(month); Serial.print("-");
@@ -338,7 +344,24 @@ void print_time() {
   if (minutes < 10) Serial.print("0");
   Serial.print(minutes); Serial.print(":");
   if (seconds < 10) Serial.print("0");
-  Serial.println(seconds);
+  Serial.print(seconds);
+  Serial.print(" | ");
+
+
+  ESP_BT.print(year); ESP_BT.print("-");
+  if (month < 10) ESP_BT.print("0");
+  ESP_BT.print(month); ESP_BT.print("-");
+  if (day < 10) ESP_BT.print("0");
+  ESP_BT.print(day); ESP_BT.print(" ");
+  if (hours < 10) ESP_BT.print("0");
+  ESP_BT.print(hours); ESP_BT.print(":");
+  if (minutes < 10) ESP_BT.print("0");
+  ESP_BT.print(minutes); ESP_BT.print(":");
+  if (seconds < 10) ESP_BT.print("0");
+  ESP_BT.print(seconds);
+  ESP_BT.print(" | ");
+
+  
 }
 
 int total_days_till_month(int month) {
@@ -468,7 +491,7 @@ void CAN_loop() {
       //printf("\n");
     }
 
-  if ( rx_frame.FIR.B.DLC < 1 ) return;
+  if ( rx_frame.FIR.B.DLC < 1) return;
   
     uint32_t ID = rx_frame.MsgID;
     byte *data = (byte*) malloc(rx_frame.FIR.B.DLC * sizeof(byte));
@@ -540,6 +563,9 @@ void setup() {
   Serial.begin(115200);
   Serial.println("\n\n\nStarting up...\n");
 
+  ESP_BT.begin("VRE_VCU"); 
+
+  ESP_BT.println("Bluetooth Logging Started"); 
   ledcSetup(TH_Channel, freq, resolution);
   ledcAttachPin(TH_EN, TH_Channel);
   
@@ -579,24 +605,30 @@ void setup() {
   CAN_setup();
 
   Serial.println("Testing device connections...");
+  ESP_BT.println("Testing device connections...");
   
   Wire.begin();
   
   rtc.initialize();
   Serial.println(rtc.testConnection() ? "DS1307 connection successful" : "DS1307 connection failed");
-  //rtc.setDateTime24(2020, 7, 14, 12, 29, 0); // Use this to set the RTC time
+  //rtc.setDateTime24(2021, 2, 11, 8, 56, 0); // Use this to set the RTC time
+  //setDateTime24(uint16_t year, uint8_t month, uint8_t day, uint8_t hours, uint8_t minutes, uint8_t seconds);
 
   accelgyro.initialize();
   Serial.print("Connecting to MPU6050");
+  // TODO : Change infinite loop to only attempt for some n times
   while (!accelgyro.testConnection()) {
     Serial.print(".");
     delay(1000);
   }
-  Serial.println("Connected");
+  Serial.println("\t Connected");
   Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+
+  ESP_BT.println("Connecting to SD Card");
 
   if(!SD.begin()){
         Serial.println("Card Mount Failed");
+        ESP_BT.println("Card Mount Failed");
         SD_available = false;
         return;
     }
@@ -604,26 +636,33 @@ void setup() {
 
     if(cardType == CARD_NONE){
         Serial.println("No SD card attached");
+        ESP_BT.println("No SD card attached");
         SD_available = false;
         return;
     }
 
     Serial.print("SD Card Type: ");
+    ESP_BT.print("");
     if(cardType == CARD_MMC){
       SD_available = true;
         Serial.println("MMC");
+        ESP_BT.println("MMC");
     } else if(cardType == CARD_SD){
       SD_available = true;
         Serial.println("SDSC");
+        ESP_BT.println("SDSC");
     } else if(cardType == CARD_SDHC){
       SD_available = true;
         Serial.println("SDHC");
+        ESP_BT.println("SDHC");
     } else {
         Serial.println("UNKNOWN");
+        ESP_BT.println("UNKNOWN");
     }
 
     uint64_t cardSize = SD.cardSize() / (1024 * 1024);
     Serial.printf("SD Card Size: %lluMB\n", cardSize);
+    ESP_BT.printf("SD Card Size: %lluMB\n", cardSize);
 
   log_sensor_names();
 
@@ -640,6 +679,7 @@ void loop() {
   log_current_frame();
   
   if (millis() - last_log_print >= 5000) {
+    print_time();
     log_current_frame_serial();
     last_log_print = millis();
   }
