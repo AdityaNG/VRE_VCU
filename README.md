@@ -37,6 +37,7 @@ Refer to [AdityaNG/VRE_CAN](https://github.com/AdityaNG/VRE_CAN) for CAN Data lo
 11. PCB - Add BSPD daughter board
 12. PCB - ESP32 [Look at Strapping Pins] Error message - :A fatal error occurred: MD5 of file does not match data in flash!" - Disconnecting pin 12 from the level shifter fixed this
 13. PCB - RTC and MPU are too close to each other
+14. PCB - Add termination resistor of either 60 Ohm or 120 Ohm to CAN (60 seems to work)
 
 ## Strapping Pins
 

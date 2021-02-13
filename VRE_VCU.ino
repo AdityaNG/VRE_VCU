@@ -15,21 +15,21 @@
 BluetoothSerial ESP_BT; 
 
 // Pin declaration 
-const int ST_EN=13, ST1=33, ST2=14, TH1=27, TH2=26, TH_EN=12;
+//const int ST_EN=13, ST1=33, ST2=14, TH1=27, TH2=26, TH_EN=12;
 //const int freq = 5000;
 const int TH_Channel = 0, ST_Channel = 2;
 //const int resolution = 8;
 
-int LED_BUILTIN = 26;
-int THROTTLE_OUT = 25;
-int BRAKE_LIGHTS = 13;
+int LED_BUILTIN = 26;     // Confirmed
+int THROTTLE_OUT = 25;    // Confirmed
+int BRAKE_LIGHTS = 34;    // Confirmed
 int LED_FAULT = 34;
 
-int BUTTON = 33;
-int APPS = 15;
-int APPS2 = 14;
-int BPS = 32;
-int BUZZER = 27;
+int BUTTON = 26;          // Confirmed
+int APPS = 33;            // Confirmed
+int APPS2 = 32;           // Confirmed
+int BPS = 14;
+int BUZZER = 35;          // Confirmed
 
 // setting PWM properties
 const int freq = 5000;
@@ -100,7 +100,8 @@ void log_sensor_names() {
 
 void log_current_frame_serial() {
   for (int i=0; i<DIRECT_SENSORS_SIZE; i++) {
-    //Serial.print(DIRECT_SENSORS_NAMES[i] + ": " + String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)) + ", ");
+    Serial.print(DIRECT_SENSORS_NAMES[i] + ": " + String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)) + ", ");
+    ESP_BT.print(DIRECT_SENSORS_NAMES[i] + ": " + String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)) + ", ");
   }
 
   for (int i=0; i<SENSORS_SIZE; i++) {
@@ -378,6 +379,7 @@ int days_in_month(int month) {
 }
 // RTC Timekeeper end
 
+/*
 void steering(int steering_angle) {
   if (steering_angle>0) {
     digitalWrite(ST1, HIGH);
@@ -396,6 +398,7 @@ void steering(int steering_angle) {
   ledcWrite(ST_Channel, out);
   Serial.println("steering_angle - " + String(steering_angle) + "; PWM - " + String(out));
 }
+
 
 void throttle(int th, bool brake) {
   if (brake) {
@@ -423,6 +426,7 @@ void throttle(int th, bool brake) {
 void throttle(int th) {
   throttle(th, false);
 }
+*/
 
 /// CAN Logging Implementation START
 
@@ -595,17 +599,19 @@ void setup() {
   ESP_BT.begin("VRE_VCU"); 
 
   ESP_BT.println("Bluetooth Logging Started"); 
-  ledcSetup(TH_Channel, freq, resolution);
-  ledcAttachPin(TH_EN, TH_Channel);
   
-  ledcSetup(ST_Channel, freq, resolution);
-  ledcAttachPin(ST_EN, ST_Channel);
+  
+  //ledcSetup(TH_Channel, freq, resolution);
+  //ledcAttachPin(TH_EN, TH_Channel);
+  
+  //ledcSetup(ST_Channel, freq, resolution);
+  //ledcAttachPin(ST_EN, ST_Channel);
   //pinMode(TH_EN, OUTPUT);
-  pinMode(TH1, OUTPUT);
-  pinMode(TH2, OUTPUT);
-  pinMode(ST_EN, OUTPUT);
-  pinMode(ST1, OUTPUT);
-  pinMode(ST2, OUTPUT);
+  //pinMode(TH1, OUTPUT);
+  //pinMode(TH2, OUTPUT);
+  //pinMode(ST_EN, OUTPUT);
+  //pinMode(ST1, OUTPUT);
+  //pinMode(ST2, OUTPUT);
 
   pinMode(THROTTLE_OUT, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
@@ -619,10 +625,10 @@ void setup() {
   pinMode(BUTTON, INPUT_PULLUP);
   //digitalWrite(BUTTON, HIGH);
   
-  pinMode(APPS, INPUT);
-  digitalWrite(APPS, HIGH);
+  //pinMode(APPS, INPUT);
+  //digitalWrite(APPS, HIGH);
   pinMode(BPS, INPUT);
-  digitalWrite(BPS, HIGH);
+  //digitalWrite(BPS, HIGH);
 
   ledcSetup(ledChannel, freq, resolution);
   ledcSetup(brakeChannel, freq, resolution);
@@ -650,59 +656,76 @@ void setup() {
   accelgyro.initialize();
   Serial.print("Connecting to MPU6050");
   // TODO : Change infinite loop to only attempt for some n times
-  while (!accelgyro.testConnection()) {
+  int mpu_connect_tries = 0;
+  while (!accelgyro.testConnection() && mpu_connect_tries<5) {
     Serial.print(".");
-    delay(1000);
+    delay(100);
+    mpu_connect_tries++;
   }
   Serial.println("\t Connected");
   Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
 
   ESP_BT.println("Connecting to SD Card");
 
+  Serial.println("Connect to Card");
+  int SD_connect_tries = 0;
+  while (!SD.begin()) {
+    Serial.print(".");
+    delay(100);
+    SD_connect_tries++;
+
+    if (SD_connect_tries>=10) {
+      Serial.println("Card Mount Failed");
+      return;
+    }
+  }
+
+  /*
   if(!SD.begin()){
-        Serial.println("Card Mount Failed");
-        ESP_BT.println("Card Mount Failed");
-        SD_available = false;
-        return;
-    }
-    uint8_t cardType = SD.cardType();
+      Serial.println("Card Mount Failed");
+      ESP_BT.println("Card Mount Failed");
+      SD_available = false;
+      return;
+  }
+  */
+  uint8_t cardType = SD.cardType();
 
-    if(cardType == CARD_NONE){
-        Serial.println("No SD card attached");
-        ESP_BT.println("No SD card attached");
-        SD_available = false;
-        return;
-    }
+  if(cardType == CARD_NONE){
+    Serial.println("No SD card attached");
+    ESP_BT.println("No SD card attached");
+    SD_available = false;
+    return;
+  }
 
-    Serial.print("SD Card Type: ");
-    ESP_BT.print("");
-    if(cardType == CARD_MMC){
-      SD_available = true;
-        Serial.println("MMC");
-        ESP_BT.println("MMC");
-    } else if(cardType == CARD_SD){
-      SD_available = true;
-        Serial.println("SDSC");
-        ESP_BT.println("SDSC");
-    } else if(cardType == CARD_SDHC){
-      SD_available = true;
-        Serial.println("SDHC");
-        ESP_BT.println("SDHC");
-    } else {
-        Serial.println("UNKNOWN");
-        ESP_BT.println("UNKNOWN");
-    }
+  Serial.print("SD Card Type: ");
+  ESP_BT.print("");
+  if(cardType == CARD_MMC){
+    SD_available = true;
+    Serial.println("MMC");
+    ESP_BT.println("MMC");
+  } else if(cardType == CARD_SD){
+    SD_available = true;
+    Serial.println("SDSC");
+    ESP_BT.println("SDSC");
+  } else if(cardType == CARD_SDHC){
+    SD_available = true;
+    Serial.println("SDHC");
+    ESP_BT.println("SDHC");
+  } else {
+    Serial.println("UNKNOWN");
+    ESP_BT.println("UNKNOWN");
+  }
 
-    uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-    Serial.printf("SD Card Size: %lluMB\n", cardSize);
-    ESP_BT.printf("SD Card Size: %lluMB\n", cardSize);
+  uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+  Serial.printf("SD Card Size: %lluMB\n", cardSize);
+  ESP_BT.printf("SD Card Size: %lluMB\n", cardSize);
 
   log_sensor_names();
 
   readFile(SD, NEW_LOG_FILE.c_str());
 }
 
-int started = false;
+bool started = false;
 int last_log_print = 0;
 String LAST_FAULT_MESSAGE = "";
 void loop() {
@@ -743,9 +766,10 @@ void loop() {
 
   bool plausibility = false;
 
-  if (abs(apps1-apps2)<409)
-    plausibility = true;
+  if (abs(apps1-apps2)<409) plausibility = true;
 
+  plausibility = true; brakes = 0;
+  
   THROTTLE_VALUE = 0;
 
   if (plausibility) {
@@ -761,7 +785,7 @@ void loop() {
 
   
 
-  /*
+  //started = true;
   if (started) {
     //Serial.print(apps1);
     //Serial.print(" - ");
@@ -784,17 +808,21 @@ void loop() {
         
           if (!button_stat) {
             started = true;
+            digitalWrite(BRAKE_LIGHTS, HIGH);
             for (int i=0; i<3; i++) {
               digitalWrite(BUZZER, HIGH);
+              
               delay(100);
               digitalWrite(BUZZER, LOW);
+              
               delay(100);
             }
+            digitalWrite(BRAKE_LIGHTS, LOW);
             Serial.println("RTDS Start");
+            ESP_BT.println("RTDS Start");
             break;
           }
       }
     }
   }
-  */
 }
