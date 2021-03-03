@@ -734,7 +734,7 @@ void loop() {
 
   log_current_frame();
   
-  if (millis() - last_log_print >= 5000) {
+  if (millis() - last_log_print >= 300) {
     print_time();
     log_current_frame_serial();
     last_log_print = millis();
