@@ -14,31 +14,33 @@
 
 BluetoothSerial ESP_BT; 
 
+/*
+34 - th1 - brown o
+35 - th2- orange
+15
+
+33 - pwm - brown - throttle
+25 - pwm - red   - steering
+26 -     - orange
+*/
+
 // Pin declaration 
-//const int ST_EN=13, ST1=33, ST2=14, TH1=27, TH2=26, TH_EN=12;
-//const int freq = 5000;
-const int TH_Channel = 0, ST_Channel = 2;
-//const int resolution = 8;
-
-int LED_BUILTIN = 26;     // Confirmed
-int THROTTLE_OUT = 25;    // Confirmed
-int BRAKE_LIGHTS = 34;    // Confirmed
-int LED_FAULT = 34;
-
-int BUTTON = 26;          // Confirmed
-int APPS = 33;            // Confirmed
-int APPS2 = 32;           // Confirmed
-int BPS = 14;
-int BUZZER = 35;          // Confirmed
-
-// setting PWM properties
+const int ST_EN=25, ST1=15, ST2=26, TH1=14, TH2=27, TH_EN=33;
+//const int TH_EN=25, TH1=15, TH2=26, ST1=34, ST2=35, ST_EN=33;
 const int freq = 5000;
-const int ledChannel = 0;
-const int brakeChannel = 2;
+const int TH_Channel = 0, ST_Channel = 2;
 const int resolution = 8;
 
-const int brake_max = 60;
-const int throttle_limit = 75;
+int LED_BUILTIN = 2;     // 
+
+// setting PWM properties
+//const int freq = 5000;
+//const int ledChannel = 0;
+//const int brakeChannel = 2;
+//const int resolution = 8;
+
+//const int brake_max = 60;
+//const int throttle_limit = 75;
 
 // CAN Data
 float current, volt, volt_12, SOC, DOD;
@@ -56,9 +58,9 @@ float RTC_TIME = 0;
 float THROTTLE_VALUE = 0;
 
 // Pins where analogRead is performed
-int DIRECT_SENSORS[] = {BUTTON, APPS, APPS2, BPS};
-String DIRECT_SENSORS_NAMES[] = {"BUTTON", "APPS1", "APPS2", "BPS"};
-int DIRECT_SENSORS_SIZE = 4;
+//int DIRECT_SENSORS[] = {BUTTON, APPS, APPS2, BPS};
+//String DIRECT_SENSORS_NAMES[] = {"BUTTON", "APPS1", "APPS2", "BPS"};
+//int DIRECT_SENSORS_SIZE = 4;
 
 // Pointers integers with more sensor data
 float *SENSORS[] = {&current, &volt, &volt_12, &SOC, &DOD, &resistance, &summed_volt, &avg_temp, &health, &low_volt_id, &high_volt_id, &amp_hrs, &CCL, &DCL, &pack_id, &internal_volt, &resistance_cell, &open_volt, &WHEEL_SPEED, &BATTERY_TEMP, &BATTERY_SOC, &BATTERY_VOLTAGE, &CURRENT_DRAW, &THROTTLE_VALUE, &RTC_TIME};
@@ -84,11 +86,11 @@ void log_sensor_names() {
 
   listDir(SD, LOGS_PATH.c_str(), 1); 
   
-  for (int i=0; i<DIRECT_SENSORS_SIZE; i++) {
+/*  for (int i=0; i<DIRECT_SENSORS_SIZE; i++) {
     appendFile(SD, NEW_LOG_FILE.c_str(), DIRECT_SENSORS_NAMES[i].c_str());
     appendFile(SD, NEW_LOG_FILE.c_str(), ",");
   }
-
+*/
   for (int i=0; i<SENSORS_SIZE; i++) {
     appendFile(SD, NEW_LOG_FILE.c_str(), SENSORS_NAMES[i].c_str());
     appendFile(SD, NEW_LOG_FILE.c_str(), ",");
@@ -99,10 +101,12 @@ void log_sensor_names() {
 
 
 void log_current_frame_serial() {
+  /*
   for (int i=0; i<DIRECT_SENSORS_SIZE; i++) {
     Serial.print(DIRECT_SENSORS_NAMES[i] + ": " + String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)) + ", ");
     ESP_BT.print(DIRECT_SENSORS_NAMES[i] + ": " + String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)) + ", ");
   }
+  */
 
   for (int i=0; i<SENSORS_SIZE; i++) {
     Serial.print(SENSORS_NAMES[i] + ": " + String(*SENSORS[i]) + ", ");
@@ -113,11 +117,13 @@ void log_current_frame_serial() {
 }
 
 void log_current_frame() {
+  /*
   for (int i=0; i<DIRECT_SENSORS_SIZE; i++) {
     appendFile(SD, NEW_LOG_FILE.c_str(), String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)).c_str());
     appendFile(SD, NEW_LOG_FILE.c_str(), ",");
     //Serial.print(DIRECT_SENSORS_NAMES[i] + ": " + String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)) + ", ");
   }
+  */
 
   for (int i=0; i<SENSORS_SIZE; i++) {
     appendFile(SD, NEW_LOG_FILE.c_str(), String(*SENSORS[i]).c_str());
@@ -379,7 +385,7 @@ int days_in_month(int month) {
 }
 // RTC Timekeeper end
 
-/*
+
 void steering(int steering_angle) {
   if (steering_angle>0) {
     digitalWrite(ST1, HIGH);
@@ -394,13 +400,32 @@ void steering(int steering_angle) {
   // TODO : Plausibility check
   //constrain(map(abs(steering_angle),0,100,0,255),0,255)
   //analogWrite(ST_EN, );
-  int out = constrain(map(abs(steering_angle),0,100,0,255),0,255);
+  int out = constrain(map(abs(steering_angle),0,240,0,255),0,255);
   ledcWrite(ST_Channel, out);
   Serial.println("steering_angle - " + String(steering_angle) + "; PWM - " + String(out));
 }
 
+void throttle(int th, int brk) {
+  if (th>0) {
+    digitalWrite(TH1, HIGH);
+    digitalWrite(TH2, LOW);
+  } else if (th<0) {
+    digitalWrite(TH1, LOW);
+    digitalWrite(TH2, HIGH);
+  } else {
+    digitalWrite(TH1, LOW);
+    digitalWrite(TH2, LOW);
+  }
+  // TODO : Plausibility check
+  //constrain(map(abs(steering_angle),0,100,0,255),0,255)
+  //analogWrite(ST_EN, );
+  int out = constrain(map(abs(th),0,240,0,255),0,255);
+  ledcWrite(TH_Channel, out);
+  Serial.println("TH - " + String(th) + "; PWM - " + String(out));
+}
 
-void throttle(int th, bool brake) {
+
+void throttle_bk(int th, bool brake) {
   if (brake) {
     digitalWrite(TH1, HIGH);
     digitalWrite(TH2, HIGH);
@@ -418,7 +443,8 @@ void throttle(int th, bool brake) {
   }
   // TODO : Plausibility check
   //constrain(map(abs(steering_angle),0,100,0,255),0,255)
-  int out = constrain(map(abs(th),0,100,0,255),0,160);
+  //int out = constrain(map(abs(th),0,240,0,255),0,160);
+  int out = constrain(map(abs(th),0,240,0,255),0,255);
   ledcWrite(TH_Channel, out);
   Serial.println("TH - " + String(th) + "; PWM - " + String(out));
 }
@@ -426,140 +452,8 @@ void throttle(int th, bool brake) {
 void throttle(int th) {
   throttle(th, false);
 }
-*/
 
-/// CAN Logging Implementation START
-
-CAN_device_t CAN_cfg;               // CAN Config
-unsigned long previousMillis = 0;   // will store last time a CAN Message was send
-const int interval = 1000;          // interval at which send CAN Messages (milliseconds)
-const int rx_queue_size = 10;       // Receive Queue size
-
-String FAULTS[8] = {"Weak Cell", "Low Cell Voltage", "Weak Cell", "Open Cell Voltage", "Weak Pack", "Thermistor", "High Voltage Isolation", "Internal Logic Fault"};
-String SIGNAL[5] = {"Ready Power Signal", "Charge Power Signal", "Depleted", "Balancing Active", "12V Power Supply Fault"};
-String FAULT_MESSAGE = "";
-const int FLT = 1, MSG = 2;
-
-String get_message(byte a, int typ) {
-  String RES = "";
-  int n = 8;
-  if (typ==MSG) {
-    n = 5;
-  }
-  for (int i=0; i<n; i++) {
-    byte b = a - B10 * (a>>1);
-    a = a>>1;
-    if (b==B1) {
-      if (typ==FLT) {
-        RES +=  FAULTS[i] + " | ";
-      } else if (typ==MSG) {
-        RES +=  SIGNAL[i] + " | ";
-      }
-    }
-  }
-  return RES;
-}
-
-void CAN_setup() {
-  CAN_cfg.speed = CAN_SPEED_250KBPS;
-  CAN_cfg.tx_pin_id = GPIO_NUM_2;
-  CAN_cfg.rx_pin_id = GPIO_NUM_4;
-  CAN_cfg.rx_queue = xQueueCreate(rx_queue_size, sizeof(CAN_frame_t));
-  // Init CAN Module
-  ESP32Can.CANInit();
-}
-
-void CAN_loop() {
-  CAN_frame_t rx_frame;
-
-  unsigned long currentMillis = millis();
-
-  // Receive next CAN frame from queue
-  if (xQueueReceive(CAN_cfg.rx_queue, &rx_frame, 3 * portTICK_PERIOD_MS) == pdTRUE) {
-
-    if (rx_frame.FIR.B.FF == CAN_frame_std) {
-      //printf("New standard frame");
-    }
-    else {
-      //printf("New extended frame");
-    }
-
-    if (rx_frame.FIR.B.RTR == CAN_RTR) {
-      //printf(" RTR from 0x%08X, DLC %d\r\n", rx_frame.MsgID,  rx_frame.FIR.B.DLC);
-    }
-    else {
-      //printf(" from 0x%08X, DLC %d, Data ", rx_frame.MsgID,  rx_frame.FIR.B.DLC);
-      for (int i = 0; i < rx_frame.FIR.B.DLC; i++) {
-        //printf("0x%02X ", rx_frame.data.u8[i]);
-      }
-      //printf("\n");
-    }
-
-  if ( rx_frame.FIR.B.DLC < 1) return;
-  
-    uint32_t ID = rx_frame.MsgID;
-    byte *data = (byte*) malloc(rx_frame.FIR.B.DLC * sizeof(byte));
-    String res = "";
-    bool fault = false;
-    for (int i=0; i<rx_frame.FIR.B.DLC; i++)
-      data[i] = rx_frame.data.u8[i];
-    
-    if (ID==0x0A) {
-      current = (data[0] * B10000000 *2) + data[1]; // In amps;
-        volt = data[2]; // Volts
-        volt_12 = data[3] / 10.0; // Divide by 10 
-        SOC = data[6];
-        DOD = data[7];
-        res = "0x0A|| current : " + String(current) + " | " + "volt : " + String(volt) + " | " + "volt_12 : " + String(volt_12) + " | " + "SOC : " + String(SOC) + " | " + "DOD : " + String(DOD) + " | ";
-        if (data[4]==0 && data[5]==0) {
-          FAULT_MESSAGE = "";
-        } else {
-          FAULT_MESSAGE = "";
-          if (data[4]!=0) { // CRITICAL
-            fault = true;
-            res+=get_message(data[4], FLT) +" | ";
-            FAULT_MESSAGE += "FAULT : { " + get_message(data[4], FLT) + " }, ";
-          }
-          if (data[5]!=0) { // NON CRITICAL
-            res+=get_message(data[5], MSG) +" | ";
-            FAULT_MESSAGE += "MESSAGE : { " + get_message(data[5], MSG) + " } ";;
-          }
-        }
-        //printf("0x0A|| current - %f | volt : %f | volt_12 : %f | SOC : %f | DOD : %f \n", current, volt, volt_12, SOC, DOD);
-    } else if (ID==0x0B) {
-        resistance = data[0] / 1000.0; //Divide by 1000 
-        health = data[1];
-        summed_volt = (data[2] * B10000000 *2) + data[3]; // V
-        avg_temp = data[4]; 
-        low_volt_id = data[6];
-        high_volt_id = data[7];
-        res = "0x0B|| resistance : " + String(resistance) + " | " + "health : " + String(health) + " | " + "summed_volt : " + String(summed_volt) + " | " + "avg_temp : " + String(avg_temp) + " | " + "low_volt_id : " + String(low_volt_id) + " | " + "high_volt_id : " + String(high_volt_id) + " | ";
-        //printf("0x0B|| resistance - %f | health : %f | summed_volt : %f | avg_temp : %f | low_volt_id : %f | high_volt_id : %f \n", resistance, health, summed_volt, avg_temp, low_volt_id, high_volt_id);
-    } else if (ID==0x0C) {
-        
-        amp_hrs = ((data[0] * B10000000 *2)  + data[1] )/10.0; // /10
-        CCL = (data[2] * B10000000 *2) + data[3]; // V
-        DCL = (data[4] * B10000000 *2) + data[5]; // V
-        res = "0x0C|| amp_hrs : " + String(amp_hrs) + " | " + "CCL : " + String(CCL) + " | " + "DCL : " + String(DCL) + " | ";
-        //printf("0x0C|| amp_hrs - %f | CCL : %f | DCL : %f \n", amp_hrs, CCL, DCL);
-    } else if (ID==0x0D) {
-      
-      pack_id = (int)data[0];
-      internal_volt = ((data[1] * B10000000 *2) + data[3])/10000.0;
-      resistance_cell = ((data[3] * B10000000 *2) + data[4])/10000.0;
-      open_volt = ((data[5] * B10000000 *2) + data[6])/10000.0;
-      //res = "0x0D|| pack_id -" + String(pack_id) + " | " + "internal_volt : " + String(internal_volt) + " | " + "resistance : " + String(resistance) + " | " + "open_volt : " + String(open_volt) + " | "; 
-      //printf("%s\n", res);
-      //printf("0x0D|| pack_id - %f | internal_volt : %f | resistance_cell : %f | open_volt : %f \n", pack_id, internal_volt, resistance_cell, open_volt);
-    }
-
-    //printf("%s\n", res);
-    free(data);
-  }
-}
-
-/// CAN Logging Implementation END
-const int SHUTDOWN_RELAY = 35;
+const int SHUTDOWN_RELAY = 13;
 void emergency_stop() {
   digitalWrite(SHUTDOWN_RELAY, LOW);
 }
@@ -569,11 +463,12 @@ void startup_TS() {
 }
 
 void ESP_BT_Commands() {
+  int byt;
   if (ESP_BT.available()) //Check if we receive anything from Bluetooth
   {
     char incoming = ESP_BT.read(); //Read what we recevive
-    Serial.print("Received:"); Serial.println(incoming);
-    ESP_BT.print("Received:"); ESP_BT.println(incoming);
+    //Serial.print("Received:"); Serial.println(incoming);
+    //ESP_BT.print("Received:"); ESP_BT.println(incoming);
     switch (incoming) {
       case 's':
         Serial.println("Remote shutdown triggered");
@@ -584,7 +479,31 @@ void ESP_BT_Commands() {
         Serial.println("Remote startup triggered");
         ESP_BT.println("Remote startup triggered");
         emergency_stop();
-        break;  
+        break;
+      case 'f':
+        while (!ESP_BT.available()) {}
+        byt = ESP_BT.read();
+        Serial.println("f : " + String(byt));
+        throttle(byt);
+        break;
+      case 'b':
+        while (!ESP_BT.available()) {}
+        byt = ESP_BT.read();
+        Serial.println("b : " + String(byt));
+        throttle(-byt);
+        break;
+      case 'l':
+        while (!ESP_BT.available()) {}
+        byt = ESP_BT.read();
+        Serial.println("l : " + String(byt));
+        steering(byt);
+        break;
+      case 'r':
+        while (!ESP_BT.available()) {}
+        byt = ESP_BT.read();
+        Serial.println("r : " + String(byt));
+        steering(-byt);
+        break;
     }
   }
 }
@@ -601,47 +520,45 @@ void setup() {
   ESP_BT.println("Bluetooth Logging Started"); 
   
   
-  //ledcSetup(TH_Channel, freq, resolution);
-  //ledcAttachPin(TH_EN, TH_Channel);
+  ledcSetup(TH_Channel, freq, resolution);
+  ledcAttachPin(TH_EN, TH_Channel);
   
-  //ledcSetup(ST_Channel, freq, resolution);
-  //ledcAttachPin(ST_EN, ST_Channel);
-  //pinMode(TH_EN, OUTPUT);
-  //pinMode(TH1, OUTPUT);
-  //pinMode(TH2, OUTPUT);
-  //pinMode(ST_EN, OUTPUT);
-  //pinMode(ST1, OUTPUT);
-  //pinMode(ST2, OUTPUT);
+  ledcSetup(ST_Channel, freq, resolution);
+  ledcAttachPin(ST_EN, ST_Channel);
+  pinMode(TH_EN, OUTPUT);
+  pinMode(TH1, OUTPUT);
+  pinMode(TH2, OUTPUT);
+  pinMode(ST_EN, OUTPUT);
+  pinMode(ST1, OUTPUT);
+  pinMode(ST2, OUTPUT);
 
-  pinMode(THROTTLE_OUT, OUTPUT);
-  pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(BRAKE_LIGHTS, OUTPUT);
+  //pinMode(THROTTLE_OUT, OUTPUT);
+  //pinMode(LED_BUILTIN, OUTPUT);
+  //pinMode(BRAKE_LIGHTS, OUTPUT);
 
 
-  pinMode(LED_FAULT, OUTPUT);
-  digitalWrite(LED_FAULT, LOW);
-  pinMode(BUZZER, OUTPUT);
+  //pinMode(LED_FAULT, OUTPUT);
+  //digitalWrite(LED_FAULT, LOW);
+  //pinMode(BUZZER, OUTPUT);
   //digitalWrite(BUZZER, LOW);
-  pinMode(BUTTON, INPUT_PULLUP);
+  //pinMode(BUTTON, INPUT_PULLUP);
   //digitalWrite(BUTTON, HIGH);
   
   //pinMode(APPS, INPUT);
   //digitalWrite(APPS, HIGH);
-  pinMode(BPS, INPUT);
+  //pinMode(BPS, INPUT);
   //digitalWrite(BPS, HIGH);
 
-  ledcSetup(ledChannel, freq, resolution);
-  ledcSetup(brakeChannel, freq, resolution);
+  //ledcSetup(ledChannel, freq, resolution);
+  //ledcSetup(brakeChannel, freq, resolution);
   
   // attach the channel to the GPIO to be controlled
-  ledcAttachPin(THROTTLE_OUT, ledChannel);
-  ledcAttachPin(LED_BUILTIN, ledChannel);
-  ledcAttachPin(BRAKE_LIGHTS, brakeChannel);
+  //ledcAttachPin(THROTTLE_OUT, ledChannel);
+  //ledcAttachPin(LED_BUILTIN, ledChannel);
+  //ledcAttachPin(BRAKE_LIGHTS, brakeChannel);
 
   pinMode(SHUTDOWN_RELAY, OUTPUT);
   startup_TS();
-
-  CAN_setup();
 
   Serial.println("Testing device connections...");
   ESP_BT.println("Testing device connections...");
@@ -674,7 +591,7 @@ void setup() {
     delay(100);
     SD_connect_tries++;
 
-    if (SD_connect_tries>=10) {
+    if (SD_connect_tries>=3) {
       Serial.println("Card Mount Failed");
       return;
     }
@@ -731,29 +648,26 @@ String LAST_FAULT_MESSAGE = "";
 void loop() {
   
   //delay(1000);
-
   log_current_frame();
   
   if (millis() - last_log_print >= 300) {
-    print_time();
-    log_current_frame_serial();
+    //print_time();
+    //log_current_frame_serial();
     last_log_print = millis();
   }
 
-  if (LAST_FAULT_MESSAGE != FAULT_MESSAGE) {
-    LAST_FAULT_MESSAGE = FAULT_MESSAGE;
-    Serial.println("[CAN] " + FAULT_MESSAGE);
-  }
-  
-  get_RTC_TIME();
+
+  //get_RTC_TIME();
   //print_time();
 
   get_MPU_values();
 
-  CAN_loop();
+  //CAN_loop();
 
   ESP_BT_Commands();
 
+  /*
+  
   int brakes = analogRead(BPS);
   brakes = map(brakes, 0, 4095, 0, 255);
   ledcWrite(brakeChannel, brakes);
@@ -785,6 +699,8 @@ void loop() {
 
   
 
+
+  */
   //started = true;
   if (started) {
     //Serial.print(apps1);
@@ -792,37 +708,9 @@ void loop() {
     //Serial.print(apps2);
     //Serial.print(" - ");
     //Serial.println(THROTTLE_VALUE);
-    ledcWrite(ledChannel, THROTTLE_VALUE);
-
+    //ledcWrite(ledChannel, abs(THROTTLE_VALUE));
+    //digitalWrite();
   } else {
-    int button_stat = digitalRead(BUTTON);
     
-    //Serial.print("Brake - ");
-    //Serial.print(brakes);
-    //Serial.print(" Button - ");
-    //Serial.println(button_stat);
-    if (button_stat && THROTTLE_VALUE<20) {
-      delay(250);
-      while (analogRead(BPS)>2000) {
-        button_stat = digitalRead(BUTTON);
-        
-          if (!button_stat) {
-            started = true;
-            digitalWrite(BRAKE_LIGHTS, HIGH);
-            for (int i=0; i<3; i++) {
-              digitalWrite(BUZZER, HIGH);
-              
-              delay(100);
-              digitalWrite(BUZZER, LOW);
-              
-              delay(100);
-            }
-            digitalWrite(BRAKE_LIGHTS, LOW);
-            Serial.println("RTDS Start");
-            ESP_BT.println("RTDS Start");
-            break;
-          }
-      }
-    }
   }
 }
