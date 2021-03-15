@@ -13,6 +13,7 @@
 #include "BluetoothSerial.h"
 
 BluetoothSerial ESP_BT; 
+bool PRINT_LOGS = true;
 
 /*
 34 - th1 - brown o
@@ -48,6 +49,9 @@ float resistance, summed_volt, avg_temp, health, low_volt_id, high_volt_id;
 float amp_hrs, CCL, DCL;
 float pack_id, internal_volt, resistance_cell, open_volt; 
 
+float axf, ayf, azf;
+float gxf, gyf, gzf;
+
 // Logger Params
 float WHEEL_SPEED = 0;
 float BATTERY_TEMP = 30;
@@ -63,8 +67,8 @@ float THROTTLE_VALUE = 0;
 //int DIRECT_SENSORS_SIZE = 4;
 
 // Pointers integers with more sensor data
-float *SENSORS[] = {&current, &volt, &volt_12, &SOC, &DOD, &resistance, &summed_volt, &avg_temp, &health, &low_volt_id, &high_volt_id, &amp_hrs, &CCL, &DCL, &pack_id, &internal_volt, &resistance_cell, &open_volt, &WHEEL_SPEED, &BATTERY_TEMP, &BATTERY_SOC, &BATTERY_VOLTAGE, &CURRENT_DRAW, &THROTTLE_VALUE, &RTC_TIME};
-String SENSORS_NAMES[] = {"current", "volt", "volt_12", "SOC", "DOD", "resistance", "summed_volt", "avg_temp", "health", "low_volt_id", "high_volt_id", "amp_hrs", "CCL", "DCL", "pack_id", "internal_volt", "resistance_cell", "open_volt", "WHEEL_SPEED", "BATTERY_TEMP", "BATTERY_SOC", "BATTERY_VOLTAGE", "CURRENT_DRAW", "THROTTLE_VALUE", "RTC_TIME"};
+float *SENSORS[] = {&axf, &ayf, &azf, &gxf, &gyf, &gzf, &current, &volt, &volt_12, &SOC, &DOD, &resistance, &summed_volt, &avg_temp, &health, &low_volt_id, &high_volt_id, &amp_hrs, &CCL, &DCL, &pack_id, &internal_volt, &resistance_cell, &open_volt, &WHEEL_SPEED, &BATTERY_TEMP, &BATTERY_SOC, &BATTERY_VOLTAGE, &CURRENT_DRAW, &THROTTLE_VALUE, &RTC_TIME};
+String SENSORS_NAMES[] = {"ax", "ay", "az", "gx", "gy", "gz", "current", "volt", "volt_12", "SOC", "DOD", "resistance", "summed_volt", "avg_temp", "health", "low_volt_id", "high_volt_id", "amp_hrs", "CCL", "DCL", "pack_id", "internal_volt", "resistance_cell", "open_volt", "WHEEL_SPEED", "BATTERY_TEMP", "BATTERY_SOC", "BATTERY_VOLTAGE", "CURRENT_DRAW", "THROTTLE_VALUE", "RTC_TIME"};
 int SENSORS_SIZE = 25;
 
 
@@ -299,6 +303,7 @@ void get_MPU_values() {
   accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);  
   // 1788 -512  15148 -263  212 -183 - Offsets
   ax-=-1788; ay-=-512; az-=15148; gx-=-263; gy-=212; gz-=-183;
+  axf=ax; ayf=ay; azf=az; gxf=gx; gyf=gy; gzf=gz;
   /*
   Serial.print("a/g:\t");
         Serial.print(ax); Serial.print("\t");
@@ -308,6 +313,7 @@ void get_MPU_values() {
         Serial.print(gy); Serial.print("\t");
         Serial.println(gz);
   */
+
         
 }
 // Gyro end
@@ -463,6 +469,50 @@ void startup_TS() {
 }
 
 void ESP_BT_Commands() {
+  String command = "";
+  char incoming = ESP_BT.read(); //Read what we recevive
+  while (ESP_BT.available() && incoming!=';') //Check if we receive anything from Bluetooth
+  {
+    command += incoming;
+    incoming = ESP_BT.read(); //Read what we recevive
+  }
+  if (command != "") {
+    ESP_BT.println("Got : " + command);
+    if (command == "start") {
+        ESP_BT.println("TS start");
+        startup_TS();
+    } else if (command == "stop") {
+      ESP_BT.println("TS stop");
+        emergency_stop();
+    } else if (command.indexOf("actuate")>=0 && command.length()==17) {
+      // Format >>actuate +050 -000;
+      // Format >>actuate +THR -STR;
+      int THR = command.substring(9,12).toInt() * ((command[8]=='-')? -1 : +1);
+      int STR = command.substring(14,17).toInt() * ((command[13]=='-')? -1 : +1);
+      throttle(THR);
+      steering(STR);
+      
+      ESP_BT.println(String(THR) + ":" + String(STR));
+    } else if (command == "log_enable") {
+      PRINT_LOGS = true;
+    } else if (command == "log_disable") {
+      PRINT_LOGS = false;
+    } else if (command == "accel") {
+      // TODO : Async ESP_BT print
+      ESP_BT.print("a/g:\t");
+        ESP_BT.print(ax); ESP_BT.print("\t");
+        ESP_BT.print(ay); ESP_BT.print("\t");
+        ESP_BT.print(az); ESP_BT.print("\t");
+        ESP_BT.print(gx); ESP_BT.print("\t");
+        ESP_BT.print(gy); ESP_BT.print("\t");
+        ESP_BT.println(gz);
+    } else {
+      ESP_BT.println("WARN unknown_command");
+    }
+  }
+  //BLE_Command_loop();
+  return;
+  /*
   int byt;
   if (ESP_BT.available()) //Check if we receive anything from Bluetooth
   {
@@ -506,6 +556,7 @@ void ESP_BT_Commands() {
         break;
     }
   }
+  */
 }
 
 void setup() {
@@ -652,7 +703,9 @@ void loop() {
   
   if (millis() - last_log_print >= 300) {
     //print_time();
-    //log_current_frame_serial();
+    //PRINT_LOGS
+    if (PRINT_LOGS)
+      log_current_frame_serial();
     last_log_print = millis();
   }
 
