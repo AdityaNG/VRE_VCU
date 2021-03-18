@@ -18,6 +18,8 @@ The VCU handles the following tasks :
 - ["FS.h"](https://github.com/espressif/arduino-esp32/blob/master/libraries/FS/src/FS.h)
 - ["SD.h"](https://github.com/espressif/arduino-esp32/blob/master/libraries/SD/src/SD.h)
 - ["SPI.h"](https://github.com/espressif/arduino-esp32/tree/master/libraries/SPI)
+- ["AdityaNG/BTS7960->BTS7960.h"](https://github.com/AdityaNG/Arduino-BTS7960)
+- [TinyGPS++](https://github.com/mikalhart/TinyGPSPlus)
 
 Refer to [AdityaNG/VRE_CAN](https://github.com/AdityaNG/VRE_CAN) for CAN Data logger implementation.
 

@@ -5,12 +5,26 @@
 #include "FS.h"
 #include "SD.h"
 #include "SPI.h"
+#include "BTS7960.h"
 
 #include <Arduino.h>
 #include <ESP32CAN.h>
 #include <CAN_config.h>
 
 #include "BluetoothSerial.h"
+
+#include <TinyGPS++.h>
+#include <SoftwareSerial.h>
+
+static const int RXPin = 16, TXPin = 17;
+static const uint32_t GPSBaud = 9600;
+
+// The TinyGPS++ object
+TinyGPSPlus gps;
+
+// The serial connection to the GPS device
+SoftwareSerial ss(RXPin, TXPin);
+
 
 BluetoothSerial ESP_BT; 
 bool PRINT_LOGS = true;
@@ -26,11 +40,22 @@ bool PRINT_LOGS = true;
 */
 
 // Pin declaration 
-const int ST_EN=25, ST1=15, ST2=26, TH1=14, TH2=27, TH_EN=33;
+const uint8_t EN_L = 33;
+const uint8_t EN_R = 25;
+const uint8_t L_PWM = 26;
+const uint8_t R_PWM = 15;
+const uint8_t R_IS = 34;
+const uint8_t L_IS = 35;
+
+BTS7960 motorController(EN_L, EN_R, L_PWM, R_PWM, L_IS, R_IS);
+
+const int ST_EN=0, ST1=0, ST2=0;
+
+//const int ST_EN=25, ST1=15, ST2=26, TH1=14, TH2=27, TH_EN=33;
 //const int TH_EN=25, TH1=15, TH2=26, ST1=34, ST2=35, ST_EN=33;
-const int freq = 5000;
-const int TH_Channel = 0, ST_Channel = 2;
-const int resolution = 8;
+//const int freq = 5000;
+//const int TH_Channel = 0, ST_Channel = 2;
+//const int resolution = 8;
 
 int LED_BUILTIN = 2;     // 
 
@@ -54,10 +79,11 @@ float gxf, gyf, gzf;
 
 // Logger Params
 float WHEEL_SPEED = 0;
-float BATTERY_TEMP = 30;
-float BATTERY_SOC = 70;
-float BATTERY_VOLTAGE = 90;
-float CURRENT_DRAW = 2;
+float BATTERY_TEMP = 0;
+float BATTERY_SOC = 0;
+float BATTERY_VOLTAGE = 0;
+float CURRENT_DRAW_L = 0;
+float CURRENT_DRAW_R = 0;
 float RTC_TIME = 0;
 float THROTTLE_VALUE = 0;
 
@@ -67,9 +93,9 @@ float THROTTLE_VALUE = 0;
 //int DIRECT_SENSORS_SIZE = 4;
 
 // Pointers integers with more sensor data
-float *SENSORS[] = {&axf, &ayf, &azf, &gxf, &gyf, &gzf, &current, &volt, &volt_12, &SOC, &DOD, &resistance, &summed_volt, &avg_temp, &health, &low_volt_id, &high_volt_id, &amp_hrs, &CCL, &DCL, &pack_id, &internal_volt, &resistance_cell, &open_volt, &WHEEL_SPEED, &BATTERY_TEMP, &BATTERY_SOC, &BATTERY_VOLTAGE, &CURRENT_DRAW, &THROTTLE_VALUE, &RTC_TIME};
-String SENSORS_NAMES[] = {"ax", "ay", "az", "gx", "gy", "gz", "current", "volt", "volt_12", "SOC", "DOD", "resistance", "summed_volt", "avg_temp", "health", "low_volt_id", "high_volt_id", "amp_hrs", "CCL", "DCL", "pack_id", "internal_volt", "resistance_cell", "open_volt", "WHEEL_SPEED", "BATTERY_TEMP", "BATTERY_SOC", "BATTERY_VOLTAGE", "CURRENT_DRAW", "THROTTLE_VALUE", "RTC_TIME"};
-int SENSORS_SIZE = 25;
+float *SENSORS[] = {&axf, &ayf, &azf, &gxf, &gyf, &gzf, &current, &volt, &volt_12, &SOC, &DOD, &resistance, &summed_volt, &avg_temp, &health, &low_volt_id, &high_volt_id, &amp_hrs, &CCL, &DCL, &pack_id, &internal_volt, &resistance_cell, &open_volt, &WHEEL_SPEED, &BATTERY_TEMP, &BATTERY_SOC, &BATTERY_VOLTAGE, &CURRENT_DRAW_L, &CURRENT_DRAW_R, &THROTTLE_VALUE, &RTC_TIME};
+String SENSORS_NAMES[] = {"ax", "ay", "az", "gx", "gy", "gz", "current", "volt", "volt_12", "SOC", "DOD", "resistance", "summed_volt", "avg_temp", "health", "low_volt_id", "high_volt_id", "amp_hrs", "CCL", "DCL", "pack_id", "internal_volt", "resistance_cell", "open_volt", "WHEEL_SPEED", "BATTERY_TEMP", "BATTERY_SOC", "BATTERY_VOLTAGE", "CURRENT_DRAW_L", "CURRENT_DRAW_R", "THROTTLE_VALUE", "RTC_TIME"};
+int SENSORS_SIZE = 26;
 
 
 bool SD_available = false;
@@ -407,30 +433,29 @@ void steering(int steering_angle) {
   //constrain(map(abs(steering_angle),0,100,0,255),0,255)
   //analogWrite(ST_EN, );
   int out = constrain(map(abs(steering_angle),0,240,0,255),0,255);
-  ledcWrite(ST_Channel, out);
-  Serial.println("steering_angle - " + String(steering_angle) + "; PWM - " + String(out));
+  analogWrite(ST_EN, out);
+  //ledcWrite(ST_Channel, out);
+  //Serial.println("steering_angle - " + String(steering_angle) + "; PWM - " + String(out));
 }
 
 void throttle(int th, int brk) {
+  motorController.Enable();
+  int out = constrain(map(abs(th),0,240,0,255),0,255);
   if (th>0) {
-    digitalWrite(TH1, HIGH);
-    digitalWrite(TH2, LOW);
+    motorController.TurnLeft(out);
   } else if (th<0) {
-    digitalWrite(TH1, LOW);
-    digitalWrite(TH2, HIGH);
+    motorController.TurnRight(out);
   } else {
-    digitalWrite(TH1, LOW);
-    digitalWrite(TH2, LOW);
+    motorController.Stop();
   }
   // TODO : Plausibility check
   //constrain(map(abs(steering_angle),0,100,0,255),0,255)
   //analogWrite(ST_EN, );
-  int out = constrain(map(abs(th),0,240,0,255),0,255);
-  ledcWrite(TH_Channel, out);
-  Serial.println("TH - " + String(th) + "; PWM - " + String(out));
+  
+  //Serial.println("TH - " + String(th) + "; PWM - " + String(out));
 }
 
-
+/*
 void throttle_bk(int th, bool brake) {
   if (brake) {
     digitalWrite(TH1, HIGH);
@@ -454,12 +479,13 @@ void throttle_bk(int th, bool brake) {
   ledcWrite(TH_Channel, out);
   Serial.println("TH - " + String(th) + "; PWM - " + String(out));
 }
+*/
 
 void throttle(int th) {
   throttle(th, false);
 }
 
-const int SHUTDOWN_RELAY = 13;
+const int SHUTDOWN_RELAY = 32;
 void emergency_stop() {
   digitalWrite(SHUTDOWN_RELAY, LOW);
 }
@@ -559,6 +585,60 @@ void ESP_BT_Commands() {
   */
 }
 
+// This custom version of delay() ensures that the gps object
+// is being "fed".
+static void smartDelay(unsigned long ms)
+{
+  unsigned long start = millis();
+  do 
+  {
+    while (ss.available())
+      gps.encode(ss.read());
+  } while (millis() - start < ms);
+}
+
+static void printInt(unsigned long val, bool valid, int len)
+{
+  char sz[32] = "*****************";
+  if (valid)
+    sprintf(sz, "%ld", val);
+  sz[len] = 0;
+  for (int i=strlen(sz); i<len; ++i)
+    sz[i] = ' ';
+  if (len > 0) 
+    sz[len-1] = ' ';
+  Serial.print(sz);
+  smartDelay(0);
+}
+
+static void printDateTime(TinyGPSDate &d, TinyGPSTime &t)
+{
+  if (!d.isValid())
+  {
+    Serial.print(F("********** "));
+  }
+  else
+  {
+    char sz[32];
+    sprintf(sz, "%02d/%02d/%02d ", d.month(), d.day(), d.year());
+    Serial.print(sz);
+  }
+  
+  if (!t.isValid())
+  {
+    Serial.print(F("******** "));
+  }
+  else
+  {
+    char sz[32];
+    sprintf(sz, "%02d:%02d:%02d ", t.hour(), t.minute(), t.second());
+    Serial.print(sz);
+  }
+
+  printInt(d.age(), d.isValid(), 5);
+  smartDelay(0);
+}
+
 void setup() {
   // initialize serial communication
   // (38400 chosen because it works as well at 8MHz as it does at 16MHz, but
@@ -570,7 +650,10 @@ void setup() {
 
   ESP_BT.println("Bluetooth Logging Started"); 
   
-  
+  pinMode(ST_EN, OUTPUT);
+  pinMode(ST1, OUTPUT);
+  pinMode(ST2, OUTPUT);
+  /*
   ledcSetup(TH_Channel, freq, resolution);
   ledcAttachPin(TH_EN, TH_Channel);
   
@@ -582,6 +665,7 @@ void setup() {
   pinMode(ST_EN, OUTPUT);
   pinMode(ST1, OUTPUT);
   pinMode(ST2, OUTPUT);
+  */
 
   //pinMode(THROTTLE_OUT, OUTPUT);
   //pinMode(LED_BUILTIN, OUTPUT);
@@ -609,7 +693,7 @@ void setup() {
   //ledcAttachPin(BRAKE_LIGHTS, brakeChannel);
 
   pinMode(SHUTDOWN_RELAY, OUTPUT);
-  startup_TS();
+  emergency_stop(); //startup_TS();
 
   Serial.println("Testing device connections...");
   ESP_BT.println("Testing device connections...");
@@ -632,6 +716,8 @@ void setup() {
   }
   Serial.println("\t Connected");
   Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+
+  ss.begin(GPSBaud);
 
   ESP_BT.println("Connecting to SD Card");
 
@@ -704,8 +790,10 @@ void loop() {
   if (millis() - last_log_print >= 300) {
     //print_time();
     //PRINT_LOGS
-    if (PRINT_LOGS)
+    if (PRINT_LOGS) {
+      printDateTime(gps.date, gps.time);
       log_current_frame_serial();
+    }
     last_log_print = millis();
   }
 
@@ -714,7 +802,8 @@ void loop() {
   //print_time();
 
   get_MPU_values();
-
+  CURRENT_DRAW_L = motorController.CurrentSenseLeft();
+  CURRENT_DRAW_R = motorController.CurrentSenseRight();
   //CAN_loop();
 
   ESP_BT_Commands();
