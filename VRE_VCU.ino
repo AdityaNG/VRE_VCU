@@ -6,7 +6,7 @@
 #include "SD.h"
 #include "SPI.h"
 #include "BTS7960.h"
-
+#include "sounddata.h"
 #include <Arduino.h>
 #include <ESP32CAN.h>
 #include <CAN_config.h>
@@ -46,6 +46,8 @@ const uint8_t L_PWM = 26;
 const uint8_t R_PWM = 15;
 const uint8_t R_IS = 34;
 const uint8_t L_IS = 35;
+
+const uint8_t BUZZER_PIN = 27;
 
 BTS7960 motorController(EN_L, EN_R, L_PWM, R_PWM, L_IS, R_IS);
 
@@ -439,8 +441,9 @@ void steering(int steering_angle) {
 }
 
 void throttle(int th, int brk) {
+  analogWriteResolution(8);
   motorController.Enable();
-  int out = constrain(map(abs(th),0,240,0,255),0,255);
+  int out = constrain(map(abs(th),0,100,0,255),0,255);
   if (th>0) {
     motorController.TurnLeft(out);
   } else if (th<0) {
@@ -488,10 +491,13 @@ void throttle(int th) {
 const int SHUTDOWN_RELAY = 32;
 void emergency_stop() {
   digitalWrite(SHUTDOWN_RELAY, LOW);
+  play_tone(stop_tone, BUZZER_PIN);
 }
+
 
 void startup_TS() {
   digitalWrite(SHUTDOWN_RELAY, HIGH);
+  play_tone(start_tone, BUZZER_PIN);
 }
 
 void ESP_BT_Commands() {
@@ -718,6 +724,8 @@ void setup() {
   Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
 
   ss.begin(GPSBaud);
+
+  play_tone(boot_tone, BUZZER_PIN);
 
   ESP_BT.println("Connecting to SD Card");
 
