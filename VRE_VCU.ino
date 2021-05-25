@@ -16,6 +16,20 @@
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
 
+#include <CircularBuffer.h>
+#define ROLLING_AVG 10
+CircularBuffer<float, ROLLING_AVG> current_l_buf;
+CircularBuffer<float, ROLLING_AVG> current_r_buf;
+
+float buf_avg(CircularBuffer<float, ROLLING_AVG> &buf) {
+  float avg = 0;
+  for (int i=0; i<buf.size(); i++) {
+    avg += buf[i];
+  }  
+  avg = avg/buf.size();
+  return avg;
+}
+
 static const int RXPin = 16, TXPin = 17;
 static const uint32_t GPSBaud = 9600;
 
@@ -27,7 +41,7 @@ SoftwareSerial ss(RXPin, TXPin);
 
 
 BluetoothSerial ESP_BT; 
-bool PRINT_LOGS = true;
+bool PRINT_LOGS = false;
 
 /*
 34 - th1 - brown o
@@ -47,11 +61,11 @@ const uint8_t R_PWM = 15;
 const uint8_t R_IS = 34;
 const uint8_t L_IS = 35;
 
-const uint8_t BUZZER_PIN = 27;
+const uint8_t BUZZER_PIN = 12;
 
 BTS7960 motorController(EN_L, EN_R, L_PWM, R_PWM, L_IS, R_IS);
 
-const int ST_EN=0, ST1=0, ST2=0;
+const int ST_EN=13, ST1=27, ST2=14;
 
 //const int ST_EN=25, ST1=15, ST2=26, TH1=14, TH2=27, TH_EN=33;
 //const int TH_EN=25, TH1=15, TH2=26, ST1=34, ST2=35, ST_EN=33;
@@ -71,15 +85,29 @@ int LED_BUILTIN = 2;     //
 //const int throttle_limit = 75;
 
 // CAN Data
+/*
 float current, volt, volt_12, SOC, DOD;
 float resistance, summed_volt, avg_temp, health, low_volt_id, high_volt_id;
 float amp_hrs, CCL, DCL;
 float pack_id, internal_volt, resistance_cell, open_volt; 
+*/
 
 float axf, ayf, azf;
 float gxf, gyf, gzf;
 
+float CURRENT_DRAW_L, CURRENT_DRAW_R, throttle_val, steering_val;
+
+/*
+ * 0,2000 - Eco    - Curent Limited to 2000
+ * 0,3000 - Normal - Curent Limited to 3000
+ * 0,4000 - Power  - No Current Limit
+*/
+float CURRENT_LIMIT = 2000;
+
+float RTC_TIME = 0;
+
 // Logger Params
+/*
 float WHEEL_SPEED = 0;
 float BATTERY_TEMP = 0;
 float BATTERY_SOC = 0;
@@ -88,6 +116,7 @@ float CURRENT_DRAW_L = 0;
 float CURRENT_DRAW_R = 0;
 float RTC_TIME = 0;
 float THROTTLE_VALUE = 0;
+*/
 
 // Pins where analogRead is performed
 //int DIRECT_SENSORS[] = {BUTTON, APPS, APPS2, BPS};
@@ -95,10 +124,13 @@ float THROTTLE_VALUE = 0;
 //int DIRECT_SENSORS_SIZE = 4;
 
 // Pointers integers with more sensor data
-float *SENSORS[] = {&axf, &ayf, &azf, &gxf, &gyf, &gzf, &current, &volt, &volt_12, &SOC, &DOD, &resistance, &summed_volt, &avg_temp, &health, &low_volt_id, &high_volt_id, &amp_hrs, &CCL, &DCL, &pack_id, &internal_volt, &resistance_cell, &open_volt, &WHEEL_SPEED, &BATTERY_TEMP, &BATTERY_SOC, &BATTERY_VOLTAGE, &CURRENT_DRAW_L, &CURRENT_DRAW_R, &THROTTLE_VALUE, &RTC_TIME};
-String SENSORS_NAMES[] = {"ax", "ay", "az", "gx", "gy", "gz", "current", "volt", "volt_12", "SOC", "DOD", "resistance", "summed_volt", "avg_temp", "health", "low_volt_id", "high_volt_id", "amp_hrs", "CCL", "DCL", "pack_id", "internal_volt", "resistance_cell", "open_volt", "WHEEL_SPEED", "BATTERY_TEMP", "BATTERY_SOC", "BATTERY_VOLTAGE", "CURRENT_DRAW_L", "CURRENT_DRAW_R", "THROTTLE_VALUE", "RTC_TIME"};
-int SENSORS_SIZE = 26;
-
+float *SENSORS[] = {&CURRENT_LIMIT, &axf, &ayf, &azf, &gxf, &gyf, &gzf, &CURRENT_DRAW_L, &CURRENT_DRAW_R, &throttle_val, &steering_val, &RTC_TIME};
+String SENSORS_NAMES[] = {"CURRENT_LIMIT","ax", "ay", "az", "gx", "gy", "gz", "CURRENT_DRAW_L", "CURRENT_DRAW_R", "throttle_val", "steering_val", "RTC_TIME"};
+int SENSORS_SIZE = 8;
+/*float *SENSORS[] = {&axf, &ayf, &azf, &gxf, &gyf, &gzf, &current, &volt, &volt_12, &SOC, &DOD, &resistance, &summed_volt, &avg_temp, &health, &low_volt_id, &high_volt_id, &amp_hrs, &CCL, &DCL, &pack_id, &internal_volt, &resistance_cell, &open_volt, &WHEEL_SPEED, &BATTERY_TEMP, &BATTERY_SOC, &BATTERY_VOLTAGE, &CURRENT_DRAW_L, &CURRENT_DRAW_R, &THROTTLE_VALUE, &RTC_TIME};
+String SENSORS_NAMES[] = {"ax", "ay", "az", "gx", "gy", "gz", "current", "volt", "volt_12", "SOC", "DOD", "resistance", "summed_volt", "avg_temp", "health", "low_volt_id", "high_volt_id", "amp_hrs", "CCL", "DCL", "pack_id", "internal_volt", "resistance_cell", 
+"open_volt", "WHEEL_SPEED", "BATTERY_TEMP", "BATTERY_SOC", "BATTERY_VOLTAGE", "CURRENT_DRAW_L", "CURRENT_DRAW_R", "THROTTLE_VALUE", "RTC_TIME" };
+int SENSORS_SIZE = 26;*/
 
 bool SD_available = false;
 String LOGS_PATH = "/VEGA";
@@ -330,7 +362,7 @@ int16_t gx, gy, gz;
 void get_MPU_values() {
   accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);  
   // 1788 -512  15148 -263  212 -183 - Offsets
-  ax-=-1788; ay-=-512; az-=15148; gx-=-263; gy-=212; gz-=-183;
+  //ax-=-1788; ay-=-512; az-=15148; gx-=-263; gy-=212; gz-=-183;
   axf=ax; ayf=ay; azf=az; gxf=gx; gyf=gy; gzf=gz;
   /*
   Serial.print("a/g:\t");
@@ -430,26 +462,45 @@ void steering(int steering_angle) {
   } else {
     digitalWrite(ST1, LOW);
     digitalWrite(ST2, LOW);
+    
+    //digitalWrite(ST1, HIGH);
+    //digitalWrite(ST2, HIGH);
+    
   }
   // TODO : Plausibility check
   //constrain(map(abs(steering_angle),0,100,0,255),0,255)
   //analogWrite(ST_EN, );
-  int out = constrain(map(abs(steering_angle),0,240,0,255),0,255);
+  int out = constrain(map(abs(steering_angle),0,100,0,255),0,255);
   analogWrite(ST_EN, out);
+  //digitalWrite(ST_EN, HIGH);
   //ledcWrite(ST_Channel, out);
   //Serial.println("steering_angle - " + String(steering_angle) + "; PWM - " + String(out));
 }
 
 void throttle(int th, int brk) {
   analogWriteResolution(8);
-  motorController.Enable();
+  motorController.Enable();  
   int out = constrain(map(abs(th),0,100,0,255),0,255);
+  //float cur = (CURRENT_DRAW_L + CURRENT_DRAW_R)/2.0;
+  if ((CURRENT_DRAW_L-CURRENT_LIMIT)>-300 || (CURRENT_DRAW_R-CURRENT_LIMIT)>-300) {
+    //th = 0;
+    //th = th * 0.1;
+    if (th != 0) {
+      th = 10;
+    }
+    Serial.println("Overcurrent");
+    //motorController.Disable();
+  } else {
+    
+  }
+  
   if (th>0) {
     motorController.TurnLeft(out);
   } else if (th<0) {
     motorController.TurnRight(out);
   } else {
     motorController.Stop();
+    //motorController.Disable();
   }
   // TODO : Plausibility check
   //constrain(map(abs(steering_angle),0,100,0,255),0,255)
@@ -509,22 +560,30 @@ void ESP_BT_Commands() {
     incoming = ESP_BT.read(); //Read what we recevive
   }
   if (command != "") {
-    ESP_BT.println("Got : " + command);
+    //ESP_BT.println("Got : " + command);
     if (command == "start") {
         ESP_BT.println("TS start");
+        Serial.println("TS start");
         startup_TS();
     } else if (command == "stop") {
-      ESP_BT.println("TS stop");
+        ESP_BT.println("TS stop");
+        Serial.println("TS stop");
         emergency_stop();
+    } else if(command.indexOf("CURRENT_LIMIT")>=0 && command.length()==18) {
+      // Format CURRENT_LIMIT 2000;
+      CURRENT_LIMIT = (float) command.substring(14,18).toInt();
+      log_current_frame_serial();
     } else if (command.indexOf("actuate")>=0 && command.length()==17) {
       // Format >>actuate +050 -000;
       // Format >>actuate +THR -STR;
-      int THR = command.substring(9,12).toInt() * ((command[8]=='-')? -1 : +1);
-      int STR = command.substring(14,17).toInt() * ((command[13]=='-')? -1 : +1);
-      throttle(THR);
-      steering(STR);
+      throttle_val = command.substring(9,12).toInt() * ((command[8]=='-')? -1 : +1);
+      steering_val = command.substring(14,17).toInt() * ((command[13]=='-')? -1 : +1);
+      throttle(throttle_val);
+      steering(steering_val);
       
-      ESP_BT.println(String(THR) + ":" + String(STR));
+      //ESP_BT.println(String(THR) + ":" + String(STR));
+      Serial.println(String(throttle_val) + ":" + String(steering_val));
+      log_current_frame_serial();
     } else if (command == "log_enable") {
       PRINT_LOGS = true;
     } else if (command == "log_disable") {
@@ -540,6 +599,7 @@ void ESP_BT_Commands() {
         ESP_BT.println(gz);
     } else {
       ESP_BT.println("WARN unknown_command");
+      Serial.println("WARN unknown_command");
     }
   }
   //BLE_Command_loop();
@@ -717,12 +777,13 @@ void setup() {
   int mpu_connect_tries = 0;
   while (!accelgyro.testConnection() && mpu_connect_tries<5) {
     Serial.print(".");
-    delay(100);
+    delay(500);
     mpu_connect_tries++;
   }
-  Serial.println("\t Connected");
+  //Serial.println("\t Connected");
   Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
 
+  Serial.println("Connecting to GPS");
   ss.begin(GPSBaud);
 
   play_tone(boot_tone, BUZZER_PIN);
@@ -793,7 +854,6 @@ String LAST_FAULT_MESSAGE = "";
 void loop() {
   
   //delay(1000);
-  log_current_frame();
   
   if (millis() - last_log_print >= 300) {
     //print_time();
@@ -810,8 +870,13 @@ void loop() {
   //print_time();
 
   get_MPU_values();
-  CURRENT_DRAW_L = motorController.CurrentSenseLeft();
-  CURRENT_DRAW_R = motorController.CurrentSenseRight();
+  //CURRENT_DRAW_L = motorController.CurrentSenseLeft();
+  //CURRENT_DRAW_R = motorController.CurrentSenseRight();
+  current_l_buf.push(motorController.CurrentSenseLeft());
+  current_r_buf.push(motorController.CurrentSenseRight());
+
+  CURRENT_DRAW_L = buf_avg(current_l_buf);
+  CURRENT_DRAW_R = buf_avg(current_r_buf);
   //CAN_loop();
 
   ESP_BT_Commands();
@@ -851,6 +916,7 @@ void loop() {
 
 
   */
+  /*
   //started = true;
   if (started) {
     //Serial.print(apps1);
@@ -863,4 +929,5 @@ void loop() {
   } else {
     
   }
+  */
 }
