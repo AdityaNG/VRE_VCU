@@ -10,6 +10,7 @@
 #include <Arduino.h>
 #include <ESP32CAN.h>
 #include <CAN_config.h>
+#include <ESP32Servo.h>
 
 #include "BluetoothSerial.h"
 
@@ -65,7 +66,16 @@ const uint8_t BUZZER_PIN = 12;
 
 BTS7960 motorController(EN_L, EN_R, L_PWM, R_PWM, L_IS, R_IS);
 
-const int ST_EN=13, ST1=27, ST2=14;
+Servo steering_servo;  // create servo object to control a servo
+// 16 servo objects can be created on the ESP32
+int full_left = 50;
+int full_right = 150;
+
+int pos = 0;    // variable to store the servo position
+// Recommended PWM GPIO pins on the ESP32 include 2,4,12-19,21-23,25-27,32-33 
+int servoPin = 27;
+
+//const int ST_EN=13, ST1=27, ST2=14;
 
 //const int ST_EN=25, ST1=15, ST2=26, TH1=14, TH2=27, TH_EN=33;
 //const int TH_EN=25, TH1=15, TH2=26, ST1=34, ST2=35, ST_EN=33;
@@ -453,50 +463,38 @@ int days_in_month(int month) {
 
 
 void steering(int steering_angle) {
-  if (steering_angle>0) {
-    digitalWrite(ST1, HIGH);
-    digitalWrite(ST2, LOW);
-  } else if (steering_angle<0) {
-    digitalWrite(ST1, LOW);
-    digitalWrite(ST2, HIGH);
-  } else {
-    digitalWrite(ST1, LOW);
-    digitalWrite(ST2, LOW);
-    
-    //digitalWrite(ST1, HIGH);
-    //digitalWrite(ST2, HIGH);
-    
-  }
+
   // TODO : Plausibility check
   //constrain(map(abs(steering_angle),0,100,0,255),0,255)
-  //analogWrite(ST_EN, );
-  int out = constrain(map(abs(steering_angle),0,100,0,255),0,255);
-  analogWrite(ST_EN, out);
-  //digitalWrite(ST_EN, HIGH);
-  //ledcWrite(ST_Channel, out);
-  //Serial.println("steering_angle - " + String(steering_angle) + "; PWM - " + String(out));
+  int out = constrain(map(steering_angle,-100,100,full_left, full_right),full_left, full_right);
+  steering_servo.write(out);
+  Serial.println("steering_angle - " + String(steering_angle) + "; PWM - " + String(out));
 }
 
 void throttle(int th, int brk) {
-  analogWriteResolution(8);
+  
   motorController.Enable();  
+  
   int out = constrain(map(abs(th),0,100,0,255),0,255);
+  //int out = constrain(map(th,-100,100,0,180),0, 180);
+  //steering_servo.write(out);
   //float cur = (CURRENT_DRAW_L + CURRENT_DRAW_R)/2.0;
   if ((CURRENT_DRAW_L-CURRENT_LIMIT)>-300 || (CURRENT_DRAW_R-CURRENT_LIMIT)>-300) {
     //th = 0;
     //th = th * 0.1;
-    if (th != 0) {
-      th = 10;
-    }
+    
+    //if (th != 0) th = 10;
     Serial.println("Overcurrent");
     //motorController.Disable();
   } else {
     
   }
+
   
   if (th>0) {
     motorController.TurnLeft(out);
   } else if (th<0) {
+    //motorController.Stop();
     motorController.TurnRight(out);
   } else {
     motorController.Stop();
@@ -504,9 +502,8 @@ void throttle(int th, int brk) {
   }
   // TODO : Plausibility check
   //constrain(map(abs(steering_angle),0,100,0,255),0,255)
-  //analogWrite(ST_EN, );
   
-  //Serial.println("TH - " + String(th) + "; PWM - " + String(out));
+  Serial.println("TH - " + String(th) + "; PWM - " + String(out));
 }
 
 /*
@@ -705,6 +702,23 @@ static void printDateTime(TinyGPSDate &d, TinyGPSTime &t)
   smartDelay(0);
 }
 
+void test_steering() {
+  for (pos = full_left; pos <= full_right; pos += 1) { // goes from 0 degrees to 180 degrees
+    // in steps of 1 degree
+    steering_servo.write(pos);    // tell servo to go to position in variable 'pos'
+    delay(15);             // waits 15ms for the servo to reach the position
+  }
+  for (pos = full_right; pos >= full_left; pos -= 1) { // goes from 180 degrees to 0 degrees
+    steering_servo.write(pos);    // tell servo to go to position in variable 'pos'
+    delay(15);             // waits 15ms for the servo to reach the position
+  }
+  for (pos = full_left; pos <= 90; pos += 1) { // goes from 0 degrees to 180 degrees
+    // in steps of 1 degree
+    steering_servo.write(pos);    // tell servo to go to position in variable 'pos'
+    delay(15);             // waits 15ms for the servo to reach the position
+  }  
+}
+
 void setup() {
   // initialize serial communication
   // (38400 chosen because it works as well at 8MHz as it does at 16MHz, but
@@ -712,51 +726,21 @@ void setup() {
   Serial.begin(115200);
   Serial.println("\n\n\nStarting up...\n");
 
+  // Allow allocation of all timers
+  ESP32PWM::allocateTimer(3);
+ 
+  steering_servo.setPeriodHertz(50);    // standard 50 hz servo
+  steering_servo.attach(servoPin, 1000, 2000); // attaches the servo on servoPin to the servo object
+
+  //test_steering();
+
+  steering_servo.write(90);
+  //delay(1000);
+
   ESP_BT.begin("VRE_VCU"); 
 
   ESP_BT.println("Bluetooth Logging Started"); 
-  
-  pinMode(ST_EN, OUTPUT);
-  pinMode(ST1, OUTPUT);
-  pinMode(ST2, OUTPUT);
-  /*
-  ledcSetup(TH_Channel, freq, resolution);
-  ledcAttachPin(TH_EN, TH_Channel);
-  
-  ledcSetup(ST_Channel, freq, resolution);
-  ledcAttachPin(ST_EN, ST_Channel);
-  pinMode(TH_EN, OUTPUT);
-  pinMode(TH1, OUTPUT);
-  pinMode(TH2, OUTPUT);
-  pinMode(ST_EN, OUTPUT);
-  pinMode(ST1, OUTPUT);
-  pinMode(ST2, OUTPUT);
-  */
 
-  //pinMode(THROTTLE_OUT, OUTPUT);
-  //pinMode(LED_BUILTIN, OUTPUT);
-  //pinMode(BRAKE_LIGHTS, OUTPUT);
-
-
-  //pinMode(LED_FAULT, OUTPUT);
-  //digitalWrite(LED_FAULT, LOW);
-  //pinMode(BUZZER, OUTPUT);
-  //digitalWrite(BUZZER, LOW);
-  //pinMode(BUTTON, INPUT_PULLUP);
-  //digitalWrite(BUTTON, HIGH);
-  
-  //pinMode(APPS, INPUT);
-  //digitalWrite(APPS, HIGH);
-  //pinMode(BPS, INPUT);
-  //digitalWrite(BPS, HIGH);
-
-  //ledcSetup(ledChannel, freq, resolution);
-  //ledcSetup(brakeChannel, freq, resolution);
-  
-  // attach the channel to the GPIO to be controlled
-  //ledcAttachPin(THROTTLE_OUT, ledChannel);
-  //ledcAttachPin(LED_BUILTIN, ledChannel);
-  //ledcAttachPin(BRAKE_LIGHTS, brakeChannel);
 
   pinMode(SHUTDOWN_RELAY, OUTPUT);
   emergency_stop(); //startup_TS();
@@ -852,6 +836,7 @@ bool started = false;
 int last_log_print = 0;
 String LAST_FAULT_MESSAGE = "";
 void loop() {
+  //test_steering();
   
   //delay(1000);
   

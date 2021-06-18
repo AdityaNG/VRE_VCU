@@ -13,7 +13,7 @@ int boot_tone[] = { 8,
 };
 
 int playing = 0;
-int tone_channel = 14;
+int tone_channel = 13;
 void tone(byte pin, int freq) {
   ledcSetup(tone_channel, 2000, 8); // setup beeper
   ledcAttachPin(pin, tone_channel); // attach beeper
