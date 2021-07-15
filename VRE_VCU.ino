@@ -471,17 +471,6 @@ void steering(int steering_angle) {
   int out = constrain(map(-steering_angle,-100,100,full_left, full_right),full_left, full_right);
   //steering_servo.write(out);
   int mid = (full_left + full_right)/2;
-
-  /*
-  if (abs(out-mid) > 10) {
-    if (out<mid)
-      out = full_left;
-     else
-      out = full_right;
-  } else {
-    out = mid;  
-  }
-  */
   
   if (last_servo_pos<out) {
     for (int i=last_servo_pos; i<out ; i++) {
@@ -496,11 +485,8 @@ void steering(int steering_angle) {
   }
 
   last_servo_pos = out;
-  //last_servo_pos = last_servo_pos + 0.5 * (out-last_servo_pos);
-  //out = last_servo_pos;
-  //steering_servo.write(out);
-  //delay(15);
-  Serial.println("steering_angle - " + String(steering_angle) + "; PWM - " + String(out));
+  
+  //Serial.println("steering_angle - " + String(steering_angle) + "; PWM - " + String(out));
 }
 
 void throttle(int th, int brk) {
@@ -536,34 +522,8 @@ void throttle(int th, int brk) {
   // TODO : Plausibility check
   //constrain(map(abs(steering_angle),0,100,0,255),0,255)
   
-  Serial.println("TH - " + String(th) + "; PWM - " + String(out));
+  //Serial.println("TH - " + String(th) + "; PWM - " + String(out));
 }
-
-/*
-void throttle_bk(int th, bool brake) {
-  if (brake) {
-    digitalWrite(TH1, HIGH);
-    digitalWrite(TH2, HIGH);
-  } else {
-    if (th>0) {
-      digitalWrite(TH1, HIGH);
-      digitalWrite(TH2, LOW);
-    } else if (th<0) {
-      digitalWrite(TH1, LOW);
-      digitalWrite(TH2, HIGH);
-    } else {
-      digitalWrite(TH1, LOW);
-      digitalWrite(TH2, LOW);
-    }
-  }
-  // TODO : Plausibility check
-  //constrain(map(abs(steering_angle),0,100,0,255),0,255)
-  //int out = constrain(map(abs(th),0,240,0,255),0,160);
-  int out = constrain(map(abs(th),0,240,0,255),0,255);
-  ledcWrite(TH_Channel, out);
-  Serial.println("TH - " + String(th) + "; PWM - " + String(out));
-}
-*/
 
 void throttle(int th) {
   throttle(th, false);
@@ -581,9 +541,19 @@ void startup_TS() {
   play_tone(start_tone, BUZZER_PIN);
 }
 
-void ESP_BT_Commands() {
-  String command = "";
+void ESP_BT_Commands() {  
+  
+  if (!ESP_BT.available())
+    return;
   char incoming = ESP_BT.read(); //Read what we recevive
+  if (incoming!=';')
+    return;
+  if (!ESP_BT.available())
+    return;
+  
+  String command = "";
+  
+  incoming = ESP_BT.read(); //Read what we recevive
   while (ESP_BT.available() && incoming!=';') //Check if we receive anything from Bluetooth
   {
     command += incoming;
@@ -612,8 +582,8 @@ void ESP_BT_Commands() {
       steering(steering_val);
       
       //ESP_BT.println(String(THR) + ":" + String(STR));
-      Serial.println(String(throttle_val) + ":" + String(steering_val));
-      log_current_frame_serial();
+      //Serial.println(String(throttle_val) + ":" + String(steering_val));
+      //log_current_frame_serial();
     } else if (command == "log_enable") {
       PRINT_LOGS = true;
     } else if (command == "log_disable") {
@@ -628,57 +598,10 @@ void ESP_BT_Commands() {
         ESP_BT.print(gy); ESP_BT.print("\t");
         ESP_BT.println(gz);
     } else {
-      ESP_BT.println("WARN unknown_command");
-      Serial.println("WARN unknown_command");
+      ESP_BT.println("WARN unknown_command ");
+      Serial.println("WARN unknown_command " + command);
     }
   }
-  //BLE_Command_loop();
-  return;
-  /*
-  int byt;
-  if (ESP_BT.available()) //Check if we receive anything from Bluetooth
-  {
-    char incoming = ESP_BT.read(); //Read what we recevive
-    //Serial.print("Received:"); Serial.println(incoming);
-    //ESP_BT.print("Received:"); ESP_BT.println(incoming);
-    switch (incoming) {
-      case 's':
-        Serial.println("Remote shutdown triggered");
-        ESP_BT.println("Remote shutdown triggered");
-        emergency_stop();
-        break;  
-      case 'g':
-        Serial.println("Remote startup triggered");
-        ESP_BT.println("Remote startup triggered");
-        emergency_stop();
-        break;
-      case 'f':
-        while (!ESP_BT.available()) {}
-        byt = ESP_BT.read();
-        Serial.println("f : " + String(byt));
-        throttle(byt);
-        break;
-      case 'b':
-        while (!ESP_BT.available()) {}
-        byt = ESP_BT.read();
-        Serial.println("b : " + String(byt));
-        throttle(-byt);
-        break;
-      case 'l':
-        while (!ESP_BT.available()) {}
-        byt = ESP_BT.read();
-        Serial.println("l : " + String(byt));
-        steering(byt);
-        break;
-      case 'r':
-        while (!ESP_BT.available()) {}
-        byt = ESP_BT.read();
-        Serial.println("r : " + String(byt));
-        steering(-byt);
-        break;
-    }
-  }
-  */
 }
 
 // This custom version of delay() ensures that the gps object
@@ -753,49 +676,49 @@ void test_steering() {
 }
 
 void setup() {
-  // initialize serial communication
-  // (38400 chosen because it works as well at 8MHz as it does at 16MHz, but
-  // it's really up to you depending on your project)
+  // Serial Communication
   Serial.begin(115200);
   Serial.println("\n\n\nStarting up...\n");
 
+  // Open SHUTDOWN_RELAY
+  pinMode(SHUTDOWN_RELAY, OUTPUT);
+  emergency_stop();
+
   // Allow allocation of all timers
-  //ESP32PWM::allocateTimer(3);
   ESP32PWM::allocateTimer(3);
- 
+
+  // Steering servo
   steering_servo.setPeriodHertz(50);    // standard 50 hz servo
   steering_servo.attach(servoPin, 1000, 2000); // attaches the servo on servoPin to the servo object
-
-  test_steering();
-
   steering_servo.write(90);
-  //delay(1000);
 
+  // Bluetooth
   ESP_BT.begin("VRE_VCU"); 
-
   ESP_BT.println("Bluetooth Logging Started"); 
 
-
-  pinMode(SHUTDOWN_RELAY, OUTPUT);
-  emergency_stop(); //startup_TS();
-
-  test_steering();
-
+  /*
+   * Start connectiing to auxillary devices
+   *  - RTC
+   *  - MPU6050
+   *  - GPS
+   *  - SD Card
+  */
   Serial.println("Testing device connections...");
   ESP_BT.println("Testing device connections...");
-  
+
+  // Start I2C
   Wire.begin();
-  
+
+  // Connectect to RTC
   rtc.initialize();
   Serial.println(rtc.testConnection() ? "DS1307 connection successful" : "DS1307 connection failed");
   //rtc.setDateTime24(2021, 2, 11, 8, 56, 0); // Use this to set the RTC time
-  //setDateTime24(uint16_t year, uint8_t month, uint8_t day, uint8_t hours, uint8_t minutes, uint8_t seconds);
 
+  // Connect to MPU6050
   accelgyro.initialize();
   Serial.print("Connecting to MPU6050");
-  // TODO : Change infinite loop to only attempt for some n times
   int mpu_connect_tries = 0;
-  while (!accelgyro.testConnection() && mpu_connect_tries<5) {
+  while (!accelgyro.testConnection() && mpu_connect_tries<1) {
     Serial.print(".");
     delay(500);
     mpu_connect_tries++;
@@ -803,156 +726,95 @@ void setup() {
   //Serial.println("\t Connected");
   Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
 
+  // Connect to GPS
+  // TODO : Test if GPS is online
   Serial.println("Connecting to GPS");
   ss.begin(GPSBaud);
 
-  play_tone(boot_tone, BUZZER_PIN);
-
-  test_steering();
-  
+  // Connect to SD Card
   ESP_BT.println("Connecting to SD Card");
-
-  Serial.println("Connect to Card");
+  Serial.println("Connecting to SD Card");
   int SD_connect_tries = 0;
   while (!SD.begin()) {
     Serial.print(".");
     delay(100);
     SD_connect_tries++;
 
-    if (SD_connect_tries>=3) {
+    if (SD_connect_tries>=1) {
       Serial.println("Card Mount Failed");
-      return;
+      break;
+    } else {
+      uint8_t cardType = SD.cardType();
+
+      if(cardType == CARD_NONE){
+        Serial.println("No SD card attached");
+        ESP_BT.println("No SD card attached");
+        SD_available = false;
+        break;
+      }
+      Serial.print("SD Card Type: ");
+      ESP_BT.print("");
+      if(cardType == CARD_MMC){
+        SD_available = true;
+        Serial.println("MMC");
+        ESP_BT.println("MMC");
+      } else if(cardType == CARD_SD){
+        SD_available = true;
+        Serial.println("SDSC");
+        ESP_BT.println("SDSC");
+      } else if(cardType == CARD_SDHC){
+        SD_available = true;
+        Serial.println("SDHC");
+        ESP_BT.println("SDHC");
+      } else {
+        Serial.println("UNKNOWN");
+        ESP_BT.println("UNKNOWN");
+      }
+      
+      uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+      Serial.printf("SD Card Size: %lluMB\n", cardSize);
+      ESP_BT.printf("SD Card Size: %lluMB\n", cardSize);
+      
+      log_sensor_names();
+      
+      readFile(SD, NEW_LOG_FILE.c_str());
+    
+      break;
     }
   }
 
-  /*
-  if(!SD.begin()){
-      Serial.println("Card Mount Failed");
-      ESP_BT.println("Card Mount Failed");
-      SD_available = false;
-      return;
-  }
-  */
-  uint8_t cardType = SD.cardType();
-
-  if(cardType == CARD_NONE){
-    Serial.println("No SD card attached");
-    ESP_BT.println("No SD card attached");
-    SD_available = false;
-    return;
-  }
-
-  Serial.print("SD Card Type: ");
-  ESP_BT.print("");
-  if(cardType == CARD_MMC){
-    SD_available = true;
-    Serial.println("MMC");
-    ESP_BT.println("MMC");
-  } else if(cardType == CARD_SD){
-    SD_available = true;
-    Serial.println("SDSC");
-    ESP_BT.println("SDSC");
-  } else if(cardType == CARD_SDHC){
-    SD_available = true;
-    Serial.println("SDHC");
-    ESP_BT.println("SDHC");
-  } else {
-    Serial.println("UNKNOWN");
-    ESP_BT.println("UNKNOWN");
-  }
-
-  uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-  Serial.printf("SD Card Size: %lluMB\n", cardSize);
-  ESP_BT.printf("SD Card Size: %lluMB\n", cardSize);
-
-  log_sensor_names();
-
-  readFile(SD, NEW_LOG_FILE.c_str());
+  // Init done
+  play_tone(boot_tone, BUZZER_PIN);
 }
 
 bool started = false;
-int last_log_print = 0;
+int last_log_print = 0, last_sesor_check = 0;
 String LAST_FAULT_MESSAGE = "";
 void loop() {
-  //test_steering();
-  
-  //delay(1000);
   
   if (millis() - last_log_print >= 3000) {
-    //print_time();
     //PRINT_LOGS
     if (PRINT_LOGS) {
+      //print_time();
       printDateTime(gps.date, gps.time);
       log_current_frame_serial();
     }
     last_log_print = millis();
-    //steering_servo.write(150);
-    //test_steering();
   }
 
+  if (millis() - last_sesor_check >= 10) {
+    get_RTC_TIME();   // Get RTC vals
+    get_MPU_values(); // GET MPU6050 vals
 
-  //get_RTC_TIME();
-  //print_time();
+    // Read Motor Current draw
+    current_l_buf.push(motorController.CurrentSenseLeft());
+    current_r_buf.push(motorController.CurrentSenseRight());
+    CURRENT_DRAW_L = buf_avg(current_l_buf);
+    CURRENT_DRAW_R = buf_avg(current_r_buf);
 
-  get_MPU_values();
-  //CURRENT_DRAW_L = motorController.CurrentSenseLeft();
-  //CURRENT_DRAW_R = motorController.CurrentSenseRight();
-  current_l_buf.push(motorController.CurrentSenseLeft());
-  current_r_buf.push(motorController.CurrentSenseRight());
-
-  CURRENT_DRAW_L = buf_avg(current_l_buf);
-  CURRENT_DRAW_R = buf_avg(current_r_buf);
-  //CAN_loop();
+    
+    last_sesor_check = millis();
+  }
 
   ESP_BT_Commands();
-
-  /*
-  
-  int brakes = analogRead(BPS);
-  brakes = map(brakes, 0, 4095, 0, 255);
-  ledcWrite(brakeChannel, brakes);
-
-  int apps1 = analogRead(APPS);
-  //apps1 = map(apps1, 0, 4095, 0, 255);
-
-  int apps2 = analogRead(APPS2);
-  //apps2 = map(apps1, 0, 4095, 0, 255);
-
-  bool plausibility = false;
-
-  if (abs(apps1-apps2)<409) plausibility = true;
-
-  plausibility = true; brakes = 0;
-  
-  THROTTLE_VALUE = 0;
-
-  if (plausibility) {
-    THROTTLE_VALUE = map((apps1 + apps2)/2, 0, 4095, 0, 255);
-  }
-  
-  if (brakes>brake_max && THROTTLE_VALUE>throttle_limit) {
-    THROTTLE_VALUE = throttle_limit;
-    digitalWrite(LED_FAULT, HIGH);
-  } else {
-    digitalWrite(LED_FAULT, LOW);
-  }
-
-  
-
-
-  */
-  /*
-  //started = true;
-  if (started) {
-    //Serial.print(apps1);
-    //Serial.print(" - ");
-    //Serial.print(apps2);
-    //Serial.print(" - ");
-    //Serial.println(THROTTLE_VALUE);
-    //ledcWrite(ledChannel, abs(THROTTLE_VALUE));
-    //digitalWrite();
-  } else {
-    
-  }
-  */
 }
