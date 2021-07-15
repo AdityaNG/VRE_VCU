@@ -68,8 +68,10 @@ BTS7960 motorController(EN_L, EN_R, L_PWM, R_PWM, L_IS, R_IS);
 
 Servo steering_servo;  // create servo object to control a servo
 // 16 servo objects can be created on the ESP32
-int full_left = 50;
-int full_right = 150;
+//int full_left = 20;
+//int full_right = 160;
+int full_left = 10;
+int full_right = 170;
 
 int pos = 0;    // variable to store the servo position
 // Recommended PWM GPIO pins on the ESP32 include 2,4,12-19,21-23,25-27,32-33 
@@ -461,17 +463,48 @@ int days_in_month(int month) {
 }
 // RTC Timekeeper end
 
-
+int last_servo_pos = (full_left + full_right)/2;
 void steering(int steering_angle) {
 
   // TODO : Plausibility check
   //constrain(map(abs(steering_angle),0,100,0,255),0,255)
-  int out = constrain(map(steering_angle,-100,100,full_left, full_right),full_left, full_right);
-  steering_servo.write(out);
+  int out = constrain(map(-steering_angle,-100,100,full_left, full_right),full_left, full_right);
+  //steering_servo.write(out);
+  int mid = (full_left + full_right)/2;
+
+  /*
+  if (abs(out-mid) > 10) {
+    if (out<mid)
+      out = full_left;
+     else
+      out = full_right;
+  } else {
+    out = mid;  
+  }
+  */
+  
+  if (last_servo_pos<out) {
+    for (int i=last_servo_pos; i<out ; i++) {
+      steering_servo.write(i);
+      delay(5);
+    }
+  } else {
+    for (int i=last_servo_pos; i>out ; i--) {
+      steering_servo.write(i);
+      delay(5);
+    }
+  }
+
+  last_servo_pos = out;
+  //last_servo_pos = last_servo_pos + 0.5 * (out-last_servo_pos);
+  //out = last_servo_pos;
+  //steering_servo.write(out);
+  //delay(15);
   Serial.println("steering_angle - " + String(steering_angle) + "; PWM - " + String(out));
 }
 
 void throttle(int th, int brk) {
+  //return;
   
   motorController.Enable();  
   
@@ -706,16 +739,16 @@ void test_steering() {
   for (pos = full_left; pos <= full_right; pos += 1) { // goes from 0 degrees to 180 degrees
     // in steps of 1 degree
     steering_servo.write(pos);    // tell servo to go to position in variable 'pos'
-    delay(15);             // waits 15ms for the servo to reach the position
+    delay(5);             // waits 15ms for the servo to reach the position
   }
   for (pos = full_right; pos >= full_left; pos -= 1) { // goes from 180 degrees to 0 degrees
     steering_servo.write(pos);    // tell servo to go to position in variable 'pos'
-    delay(15);             // waits 15ms for the servo to reach the position
+    delay(5);             // waits 15ms for the servo to reach the position
   }
   for (pos = full_left; pos <= 90; pos += 1) { // goes from 0 degrees to 180 degrees
     // in steps of 1 degree
     steering_servo.write(pos);    // tell servo to go to position in variable 'pos'
-    delay(15);             // waits 15ms for the servo to reach the position
+    delay(5);             // waits 15ms for the servo to reach the position
   }  
 }
 
@@ -727,12 +760,13 @@ void setup() {
   Serial.println("\n\n\nStarting up...\n");
 
   // Allow allocation of all timers
+  //ESP32PWM::allocateTimer(3);
   ESP32PWM::allocateTimer(3);
  
   steering_servo.setPeriodHertz(50);    // standard 50 hz servo
   steering_servo.attach(servoPin, 1000, 2000); // attaches the servo on servoPin to the servo object
 
-  //test_steering();
+  test_steering();
 
   steering_servo.write(90);
   //delay(1000);
@@ -744,6 +778,8 @@ void setup() {
 
   pinMode(SHUTDOWN_RELAY, OUTPUT);
   emergency_stop(); //startup_TS();
+
+  test_steering();
 
   Serial.println("Testing device connections...");
   ESP_BT.println("Testing device connections...");
@@ -772,6 +808,8 @@ void setup() {
 
   play_tone(boot_tone, BUZZER_PIN);
 
+  test_steering();
+  
   ESP_BT.println("Connecting to SD Card");
 
   Serial.println("Connect to Card");
@@ -840,7 +878,7 @@ void loop() {
   
   //delay(1000);
   
-  if (millis() - last_log_print >= 300) {
+  if (millis() - last_log_print >= 3000) {
     //print_time();
     //PRINT_LOGS
     if (PRINT_LOGS) {
@@ -848,6 +886,8 @@ void loop() {
       log_current_frame_serial();
     }
     last_log_print = millis();
+    //steering_servo.write(150);
+    //test_steering();
   }
 
 
