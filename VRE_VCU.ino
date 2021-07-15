@@ -478,33 +478,58 @@ void steering(int steering_angle) {
 
   // TODO : Plausibility check
   //constrain(map(abs(steering_angle),0,100,0,255),0,255)
-  int out = constrain(map(-steering_angle,-100,100,full_left, full_right),full_left, full_right);
+  //int out = constrain(map(-steering_angle,-100,100,full_left, full_right),full_left, full_right);
+  int out = constrain(map(steering_angle,-255,255,full_left, full_right),full_left, full_right);
   //steering_servo.write(out);
-  int mid = (full_left + full_right)/2;
-  
-  if (last_servo_pos<out) {
-    for (int i=last_servo_pos; i<out ; i++) {
-      steering_servo.write(i);
-      delay(5);
-    }
-  } else {
-    for (int i=last_servo_pos; i>out ; i--) {
-      steering_servo.write(i);
-      delay(5);
-    }
-  }
 
-  last_servo_pos = out;
+/*
+  if (last_servo_pos - out < -20) {
+    for (int i=0; i<inc; i++) {
+      steering_servo.write(last_servo_pos + i);  
+      delay(5);
+    }
+    last_servo_pos += inc;
+  } else if (last_servo_pos - out > 20) {
+    for (int i=0; i<inc; i++) {
+      steering_servo.write(last_servo_pos - i);   
+    }
+    last_servo_pos -= inc;
+  }*/
+  
+  int mid = (full_left + full_right)/2;
+  int inc = 50;
+  inc = min(inc, abs(last_servo_pos-out));
+  if (last_servo_pos<out) {
+    for (int i=0; i<inc; i++) {
+      steering_servo.write(last_servo_pos + i);  
+      delay(5);
+    }
+    last_servo_pos += inc;
+  } else if (last_servo_pos>out) {
+    for (int i=0; i<inc; i++) {
+      steering_servo.write(last_servo_pos - i); 
+      delay(5);  
+    }
+    last_servo_pos -= inc;
+  }
+  //delay(1);
+
+  //last_servo_pos = out;
   
   //Serial.println("steering_angle - " + String(steering_angle) + "; PWM - " + String(out));
 }
 
 void throttle(int th, int brk) {
   //return;
-  
   motorController.Enable();  
+
+  if (brk) {
+    motorController.Stop();  
+    return;
+  }
   
-  int out = constrain(map(abs(th),0,100,0,255),0,255);
+  //int out = constrain(map(abs(th),0,100,0,255),0,255);
+  int out = abs(th);
   //int out = constrain(map(th,-100,100,0,180),0, 180);
   //steering_servo.write(out);
   //float cur = (CURRENT_DRAW_L + CURRENT_DRAW_R)/2.0;
@@ -526,7 +551,7 @@ void throttle(int th, int brk) {
     //motorController.Stop();
     motorController.TurnRight(out);
   } else {
-    motorController.Stop();
+    //motorController.Stop();
     //motorController.Disable();
   }
   // TODO : Plausibility check
@@ -552,6 +577,82 @@ void startup_TS() {
 }
 
 void ESP_BT_Commands(void *pvParameters) {
+  int last_recieved_command = 0;  
+  (void) pvParameters;
+
+  bool ts_stat = false;
+
+  while (true) {
+    if (!ESP_BT.available())
+      continue;
+    char incoming = ESP_BT.read(); //Read what we recevive
+    if (incoming!=';')
+      continue;
+    if (!ESP_BT.available())
+      continue;
+    
+    int b1, th, st;
+
+    b1 = ESP_BT.read();
+    th = ESP_BT.read();
+    st = ESP_BT.read();    
+
+    bool sd, p, lg, regen, z1, z2, lft, rev;
+
+    sd    = b1>>7 & 1;
+    p     = b1>>6 & 1;
+    lg    = b1>>5 & 1;
+    regen = b1>>4 & 1;
+    z1    = b1>>3 & 1;
+    z2    = b1>>2 & 1;
+    lft   = b1>>1 & 1;
+    rev   = b1>>0 & 1;
+
+    th = th * ((!rev)? 1: -1);
+    st = st * ((lft)? 1: -1);
+
+    /*
+    Serial.print(sd);
+    Serial.print(p);
+    Serial.print(lg);
+    Serial.print(regen);
+    Serial.print(" ");
+    Serial.print(z1);
+    Serial.print(z2);
+    Serial.print(lft);
+    Serial.print(rev);
+    Serial.print(" ");
+    Serial.print(th);
+    Serial.print(" ");
+    Serial.print(st);
+    Serial.println();
+    */
+    
+    if (p!=0 || z1!=0 || z2!=0)
+      continue;
+
+    if (ts_stat && sd) {
+      //Shutdown 
+      emergency_stop(); 
+      ts_stat = false;
+    }
+
+    if (!ts_stat && !sd) {
+      // start
+      startup_TS();
+      ts_stat = true;
+    }
+
+    throttle(th, regen);
+    steering(st);
+    
+    //last_recieved_command = millis();
+    //xQueueSend(queue, &last_recieved_command, portMAX_DELAY);
+    
+  }
+}
+
+void ESP_BT_Commands_OLD(void *pvParameters) {
   int last_recieved_command = 0;  
   (void) pvParameters;
 
