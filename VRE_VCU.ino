@@ -1,3 +1,9 @@
+#if CONFIG_FREERTOS_UNICORE
+#define ARDUINO_RUNNING_CORE 0
+#else
+#define ARDUINO_RUNNING_CORE 1
+#endif
+
 #include "Wire.h"
 #include "I2Cdev.h"
 #include "./DS1307.h"
@@ -43,6 +49,10 @@ SoftwareSerial ss(RXPin, TXPin);
 
 BluetoothSerial ESP_BT; 
 bool PRINT_LOGS = false;
+
+
+QueueHandle_t queue;
+int queueSize = 1;
 
 /*
 34 - th1 - brown o
@@ -541,65 +551,71 @@ void startup_TS() {
   play_tone(start_tone, BUZZER_PIN);
 }
 
-void ESP_BT_Commands() {  
-  
-  if (!ESP_BT.available())
-    return;
-  char incoming = ESP_BT.read(); //Read what we recevive
-  if (incoming!=';')
-    return;
-  if (!ESP_BT.available())
-    return;
-  
-  String command = "";
-  
-  incoming = ESP_BT.read(); //Read what we recevive
-  while (ESP_BT.available() && incoming!=';') //Check if we receive anything from Bluetooth
-  {
-    command += incoming;
+void ESP_BT_Commands(void *pvParameters) {
+  int last_recieved_command = 0;  
+  (void) pvParameters;
+
+  while (true) {
+    if (!ESP_BT.available())
+      continue;
+    char incoming = ESP_BT.read(); //Read what we recevive
+    if (incoming!=';')
+      continue;
+    if (!ESP_BT.available())
+      continue;
+    
+    String command = "";
+    
     incoming = ESP_BT.read(); //Read what we recevive
-  }
-  if (command != "") {
-    //ESP_BT.println("Got : " + command);
-    if (command == "start") {
-        ESP_BT.println("TS start");
-        Serial.println("TS start");
-        startup_TS();
-    } else if (command == "stop") {
-        ESP_BT.println("TS stop");
-        Serial.println("TS stop");
-        emergency_stop();
-    } else if(command.indexOf("CURRENT_LIMIT")>=0 && command.length()==18) {
-      // Format CURRENT_LIMIT 2000;
-      CURRENT_LIMIT = (float) command.substring(14,18).toInt();
-      log_current_frame_serial();
-    } else if (command.indexOf("actuate")>=0 && command.length()==17) {
-      // Format >>actuate +050 -000;
-      // Format >>actuate +THR -STR;
-      throttle_val = command.substring(9,12).toInt() * ((command[8]=='-')? -1 : +1);
-      steering_val = command.substring(14,17).toInt() * ((command[13]=='-')? -1 : +1);
-      throttle(throttle_val);
-      steering(steering_val);
-      
-      //ESP_BT.println(String(THR) + ":" + String(STR));
-      //Serial.println(String(throttle_val) + ":" + String(steering_val));
-      //log_current_frame_serial();
-    } else if (command == "log_enable") {
-      PRINT_LOGS = true;
-    } else if (command == "log_disable") {
-      PRINT_LOGS = false;
-    } else if (command == "accel") {
-      // TODO : Async ESP_BT print
-      ESP_BT.print("a/g:\t");
-        ESP_BT.print(ax); ESP_BT.print("\t");
-        ESP_BT.print(ay); ESP_BT.print("\t");
-        ESP_BT.print(az); ESP_BT.print("\t");
-        ESP_BT.print(gx); ESP_BT.print("\t");
-        ESP_BT.print(gy); ESP_BT.print("\t");
-        ESP_BT.println(gz);
-    } else {
-      ESP_BT.println("WARN unknown_command ");
-      Serial.println("WARN unknown_command " + command);
+    while (ESP_BT.available() && incoming!=';') //Check if we receive anything from Bluetooth
+    {
+      command += incoming;
+      incoming = ESP_BT.read(); //Read what we recevive
+    }
+    last_recieved_command = millis();
+    xQueueSend(queue, &last_recieved_command, portMAX_DELAY);
+    if (command != "") {
+      //ESP_BT.println("Got : " + command);
+      if (command == "start") {
+          ESP_BT.println("TS start");
+          Serial.println("TS start");
+          startup_TS();
+      } else if (command == "stop") {
+          ESP_BT.println("TS stop");
+          Serial.println("TS stop");
+          emergency_stop();
+      } else if(command.indexOf("CURRENT_LIMIT")>=0 && command.length()==18) {
+        // Format CURRENT_LIMIT 2000;
+        CURRENT_LIMIT = (float) command.substring(14,18).toInt();
+        log_current_frame_serial();
+      } else if (command.indexOf("actuate")>=0 && command.length()==17) {
+        // Format >>actuate +050 -000;
+        // Format >>actuate +THR -STR;
+        throttle_val = command.substring(9,12).toInt() * ((command[8]=='-')? -1 : +1);
+        steering_val = command.substring(14,17).toInt() * ((command[13]=='-')? -1 : +1);
+        throttle(throttle_val);
+        steering(steering_val);
+        
+        //ESP_BT.println(String(THR) + ":" + String(STR));
+        //Serial.println(String(throttle_val) + ":" + String(steering_val));
+        //log_current_frame_serial();
+      } else if (command == "log_enable") {
+        PRINT_LOGS = true;
+      } else if (command == "log_disable") {
+        PRINT_LOGS = false;
+      } else if (command == "accel") {
+        // TODO : Async ESP_BT print
+        ESP_BT.print("a/g:\t");
+          ESP_BT.print(ax); ESP_BT.print("\t");
+          ESP_BT.print(ay); ESP_BT.print("\t");
+          ESP_BT.print(az); ESP_BT.print("\t");
+          ESP_BT.print(gx); ESP_BT.print("\t");
+          ESP_BT.print(gy); ESP_BT.print("\t");
+          ESP_BT.println(gz);
+      } else {
+        ESP_BT.println("WARN unknown_command ");
+        Serial.println("WARN unknown_command " + command);
+      }
     }
   }
 }
@@ -674,6 +690,8 @@ void test_steering() {
     delay(5);             // waits 15ms for the servo to reach the position
   }  
 }
+
+void main_loop(void *pvParameters);
 
 void setup() {
   // Serial Communication
@@ -785,36 +803,92 @@ void setup() {
 
   // Init done
   play_tone(boot_tone, BUZZER_PIN);
+
+  queue = xQueueCreate( queueSize, sizeof( int ) );
+
+  if(queue == NULL){
+    Serial.println("Error creating the queue");
+  }
+  
+  // Now set up two tasks to run independently.
+  xTaskCreatePinnedToCore(
+    ESP_BT_Commands
+    ,  "ESP_BT_Commands"   // A name just for humans
+    ,  10240  // This stack size can be checked & adjusted by reading the Stack Highwater
+    ,  NULL
+    ,  2  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+    ,  NULL 
+    ,  ARDUINO_RUNNING_CORE);
+
+  xTaskCreatePinnedToCore(
+    main_loop
+    ,  "main_loop"
+    ,  10240  // Stack size
+    ,  NULL
+    ,  1  // Priority
+    ,  NULL 
+    ,  ARDUINO_RUNNING_CORE);
+
+  
+}
+
+void loop()
+{
+  // Empty. Things are done in Tasks.
 }
 
 bool started = false;
 int last_log_print = 0, last_sesor_check = 0;
 String LAST_FAULT_MESSAGE = "";
-void loop() {
-  
-  if (millis() - last_log_print >= 3000) {
-    //PRINT_LOGS
-    if (PRINT_LOGS) {
-      //print_time();
-      printDateTime(gps.date, gps.time);
-      log_current_frame_serial();
+void main_loop(void *pvParameters) {
+  int last_recieved_command = 0;
+  while (true) {
+
+    if (millis() - last_log_print >= 3000) {
+      //PRINT_LOGS
+      if (PRINT_LOGS) {
+        //print_time();
+        printDateTime(gps.date, gps.time);
+        log_current_frame_serial();
+      }
+      last_log_print = millis();
     }
-    last_log_print = millis();
-  }
+  
+    if (millis() - last_sesor_check >= 1000) {
+      get_RTC_TIME();   // Get RTC vals
+      get_MPU_values(); // GET MPU6050 vals
+  
+      // Read Motor Current draw
+      current_l_buf.push(motorController.CurrentSenseLeft());
+      current_r_buf.push(motorController.CurrentSenseRight());
+      CURRENT_DRAW_L = buf_avg(current_l_buf);
+      CURRENT_DRAW_R = buf_avg(current_r_buf);
+  
+      
+      last_sesor_check = millis();
+    }
 
-  if (millis() - last_sesor_check >= 10) {
-    get_RTC_TIME();   // Get RTC vals
-    get_MPU_values(); // GET MPU6050 vals
+   // TODO : Throttle kill
 
-    // Read Motor Current draw
-    current_l_buf.push(motorController.CurrentSenseLeft());
-    current_r_buf.push(motorController.CurrentSenseRight());
-    CURRENT_DRAW_L = buf_avg(current_l_buf);
-    CURRENT_DRAW_R = buf_avg(current_r_buf);
+    /*
+    int messagesWaiting = uxQueueMessagesWaiting(queue);
+    if (messagesWaiting>0) {
+      //xQueueReceive(queue, &last_recieved_command, portMAX_DELAY); 
+      xQueueReceive(queue, &last_recieved_command, 0); 
+    }*/
 
+    /*
+    xQueueReceive(queue, &last_recieved_command, 0); 
     
-    last_sesor_check = millis();
-  }
+    Serial.println("Delay : " + String(millis() - last_recieved_command ));
+    
+    if (millis() - last_recieved_command > 1500) {
+      throttle(0);
+      Serial.println("KILLING THROTTLE");
+      //delay(1000);
+    }
+    */
 
-  ESP_BT_Commands();
+    //delay(500);
+  }
 }
