@@ -21,15 +21,15 @@ const int TH_Channel = 0, ST_Channel = 2;
 //const int resolution = 8;
 
 int LED_BUILTIN = 26;     // Confirmed
-int THROTTLE_OUT = 25;    // Confirmed
-int BRAKE_LIGHTS = 34;    // Confirmed
-int LED_FAULT = 34;
+int THROTTLE_OUT = 32;    // Confirmed
+int BRAKE_LIGHTS = 0;
+int LED_FAULT = 0;
 
-int BUTTON = 26;          // Confirmed
+int BUTTON = 26;
 int APPS = 33;            // Confirmed
-int APPS2 = 32;           // Confirmed
+int APPS2 = 25;           // Confirmed
 int BPS = 14;
-int BUZZER = 35;          // Confirmed
+int BUZZER = 0; 
 
 // setting PWM properties
 const int freq = 5000;
@@ -55,15 +55,26 @@ float CURRENT_DRAW = 2;
 float RTC_TIME = 0;
 float THROTTLE_VALUE = 0;
 
+// Accel Gyro
+// Gyro
+MPU6050 accelgyro(0x69); // <-- use for AD0 high
+
+int16_t ax, ay, az;
+int16_t gx, gy, gz;
+
 // Pins where analogRead is performed
 int DIRECT_SENSORS[] = {BUTTON, APPS, APPS2, BPS};
 String DIRECT_SENSORS_NAMES[] = {"BUTTON", "APPS1", "APPS2", "BPS"};
 int DIRECT_SENSORS_SIZE = 4;
 
 // Pointers integers with more sensor data
-float *SENSORS[] = {&current, &volt, &volt_12, &SOC, &DOD, &resistance, &summed_volt, &avg_temp, &health, &low_volt_id, &high_volt_id, &amp_hrs, &CCL, &DCL, &pack_id, &internal_volt, &resistance_cell, &open_volt, &WHEEL_SPEED, &BATTERY_TEMP, &BATTERY_SOC, &BATTERY_VOLTAGE, &CURRENT_DRAW, &THROTTLE_VALUE, &RTC_TIME};
-String SENSORS_NAMES[] = {"current", "volt", "volt_12", "SOC", "DOD", "resistance", "summed_volt", "avg_temp", "health", "low_volt_id", "high_volt_id", "amp_hrs", "CCL", "DCL", "pack_id", "internal_volt", "resistance_cell", "open_volt", "WHEEL_SPEED", "BATTERY_TEMP", "BATTERY_SOC", "BATTERY_VOLTAGE", "CURRENT_DRAW", "THROTTLE_VALUE", "RTC_TIME"};
+float *SENSORS[] = {&THROTTLE_VALUE, &current, &volt, &volt_12, &SOC, &DOD, &resistance, &summed_volt, &avg_temp, &health, &low_volt_id, &high_volt_id, &amp_hrs, &CCL, &DCL, &pack_id, &internal_volt, &resistance_cell, &open_volt, &WHEEL_SPEED, &BATTERY_TEMP, &BATTERY_SOC, &BATTERY_VOLTAGE, &CURRENT_DRAW, &THROTTLE_VALUE, &RTC_TIME};
+String SENSORS_NAMES[] = {"THROTTLE_VALUE", "current", "volt", "volt_12", "SOC", "DOD", "resistance", "summed_volt", "avg_temp", "health", "low_volt_id", "high_volt_id", "amp_hrs", "CCL", "DCL", "pack_id", "internal_volt", "resistance_cell", "open_volt", "WHEEL_SPEED", "BATTERY_TEMP", "BATTERY_SOC", "BATTERY_VOLTAGE", "CURRENT_DRAW", "THROTTLE_VALUE", "RTC_TIME"};
 int SENSORS_SIZE = 25;
+
+int16_t *SENSORS_INT[] = {&ax, &ay, &az, &gx, &gy, &gz};
+String SENSORS_INT_NAMES[] = {"ax", "ay", "az", "gx", "gy", "gz"};
+int SENSORS_INT_SIZE = 6;
 
 
 bool SD_available = false;
@@ -99,15 +110,24 @@ void log_sensor_names() {
 
 
 void log_current_frame_serial() {
+  
   for (int i=0; i<DIRECT_SENSORS_SIZE; i++) {
-    Serial.print(DIRECT_SENSORS_NAMES[i] + ": " + String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)) + ", ");
-    ESP_BT.print(DIRECT_SENSORS_NAMES[i] + ": " + String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)) + ", ");
+    Serial.print(DIRECT_SENSORS_NAMES[i] + ": " + String(analogRead(DIRECT_SENSORS[i])) + ", ");
+    ESP_BT.print(DIRECT_SENSORS_NAMES[i] + ": " + String(analogRead(DIRECT_SENSORS[i])) + ", ");
+    //Serial.print(DIRECT_SENSORS_NAMES[i] + ": " + String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)) + ", ");
+    //ESP_BT.print(DIRECT_SENSORS_NAMES[i] + ": " + String(map(analogRead(DIRECT_SENSORS[i]), 0, 4095, 0, 255)) + ", ");
   }
 
   for (int i=0; i<SENSORS_SIZE; i++) {
     Serial.print(SENSORS_NAMES[i] + ": " + String(*SENSORS[i]) + ", ");
     ESP_BT.print(SENSORS_NAMES[i] + ": " + String(*SENSORS[i]) + ", ");
   }
+  
+  for (int i=0; i<SENSORS_INT_SIZE; i++) {
+    Serial.print(SENSORS_INT_NAMES[i] + ": " + String(*SENSORS_INT[i]) + ", ");
+    ESP_BT.print(SENSORS_INT_NAMES[i] + ": " + String(*SENSORS_INT[i]) + ", ");
+  }
+
   Serial.println();
   ESP_BT.println();
 }
@@ -283,12 +303,6 @@ void deleteFile(fs::FS &fs, const char * path){
 }
 // Files END
 
-// Gyro
-MPU6050 accelgyro(0x69); // <-- use for AD0 high
-
-int16_t ax, ay, az;
-int16_t gx, gy, gz;
-
 void get_MPU_values() {
   accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);  
   // 1788 -512  15148 -263  212 -183 - Offsets
@@ -379,54 +393,6 @@ int days_in_month(int month) {
 }
 // RTC Timekeeper end
 
-/*
-void steering(int steering_angle) {
-  if (steering_angle>0) {
-    digitalWrite(ST1, HIGH);
-    digitalWrite(ST2, LOW);
-  } else if (steering_angle<0) {
-    digitalWrite(ST1, LOW);
-    digitalWrite(ST2, HIGH);
-  } else {
-    digitalWrite(ST1, LOW);
-    digitalWrite(ST2, LOW);
-  }
-  // TODO : Plausibility check
-  //constrain(map(abs(steering_angle),0,100,0,255),0,255)
-  //analogWrite(ST_EN, );
-  int out = constrain(map(abs(steering_angle),0,100,0,255),0,255);
-  ledcWrite(ST_Channel, out);
-  Serial.println("steering_angle - " + String(steering_angle) + "; PWM - " + String(out));
-}
-
-
-void throttle(int th, bool brake) {
-  if (brake) {
-    digitalWrite(TH1, HIGH);
-    digitalWrite(TH2, HIGH);
-  } else {
-    if (th>0) {
-      digitalWrite(TH1, HIGH);
-      digitalWrite(TH2, LOW);
-    } else if (th<0) {
-      digitalWrite(TH1, LOW);
-      digitalWrite(TH2, HIGH);
-    } else {
-      digitalWrite(TH1, LOW);
-      digitalWrite(TH2, LOW);
-    }
-  }
-  // TODO : Plausibility check
-  //constrain(map(abs(steering_angle),0,100,0,255),0,255)
-  int out = constrain(map(abs(th),0,100,0,255),0,160);
-  ledcWrite(TH_Channel, out);
-  Serial.println("TH - " + String(th) + "; PWM - " + String(out));
-}
-
-void throttle(int th) {
-  throttle(th, false);
-}
-*/
 
 /// CAN Logging Implementation START
 
@@ -625,7 +591,8 @@ void setup() {
   pinMode(BUTTON, INPUT_PULLUP);
   //digitalWrite(BUTTON, HIGH);
   
-  //pinMode(APPS, INPUT);
+  pinMode(APPS, INPUT);
+  pinMode(APPS2, INPUT);
   //digitalWrite(APPS, HIGH);
   pinMode(BPS, INPUT);
   //digitalWrite(BPS, HIGH);
@@ -650,7 +617,7 @@ void setup() {
   
   rtc.initialize();
   Serial.println(rtc.testConnection() ? "DS1307 connection successful" : "DS1307 connection failed");
-  //rtc.setDateTime24(2021, 2, 11, 8, 56, 0); // Use this to set the RTC time
+  //rtc.setDateTime24(2021, 8, 29, 11, 33, 0); // Use this to set the RTC time
   //setDateTime24(uint16_t year, uint8_t month, uint8_t day, uint8_t hours, uint8_t minutes, uint8_t seconds);
 
   accelgyro.initialize();
@@ -674,7 +641,7 @@ void setup() {
     delay(100);
     SD_connect_tries++;
 
-    if (SD_connect_tries>=10) {
+    if (SD_connect_tries>=3) {
       Serial.println("Card Mount Failed");
       return;
     }
@@ -735,8 +702,8 @@ void loop() {
   log_current_frame();
   
   if (millis() - last_log_print >= 300) {
-    print_time();
-    log_current_frame_serial();
+    //print_time();
+    //log_current_frame_serial();
     last_log_print = millis();
   }
 
@@ -746,13 +713,12 @@ void loop() {
   }
   
   get_RTC_TIME();
-  //print_time();
-
+  
   get_MPU_values();
 
   CAN_loop();
 
-  ESP_BT_Commands();
+  //ESP_BT_Commands();
 
   int brakes = analogRead(BPS);
   brakes = map(brakes, 0, 4095, 0, 255);
@@ -764,34 +730,20 @@ void loop() {
   int apps2 = analogRead(APPS2);
   //apps2 = map(apps1, 0, 4095, 0, 255);
 
-  bool plausibility = false;
+  int MIN_APPS1=0, MAX_APPS1=4095, MIN_THROTTLE = 0, MAX_THROTTLE = 4095;
 
-  if (abs(apps1-apps2)<409) plausibility = true;
-
-  plausibility = true; brakes = 0;
-  
   THROTTLE_VALUE = 0;
-
-  if (plausibility) {
-    THROTTLE_VALUE = map((apps1 + apps2)/2, 0, 4095, 0, 255);
-  }
-  
-  if (brakes>brake_max && THROTTLE_VALUE>throttle_limit) {
-    THROTTLE_VALUE = throttle_limit;
-    digitalWrite(LED_FAULT, HIGH);
-  } else {
-    digitalWrite(LED_FAULT, LOW);
-  }
-
+  if (MIN_APPS1 <= apps1 && apps1 <= MAX_APPS1)
+    THROTTLE_VALUE = constrain(map(apps1, MIN_APPS1, MAX_APPS1, MIN_THROTTLE, MAX_THROTTLE), MIN_THROTTLE, MAX_THROTTLE);
   
 
-  //started = true;
+  started = true;
   if (started) {
-    //Serial.print(apps1);
-    //Serial.print(" - ");
-    //Serial.print(apps2);
-    //Serial.print(" - ");
-    //Serial.println(THROTTLE_VALUE);
+    Serial.print(apps1);
+    Serial.print(",");
+    Serial.print(apps2);
+    Serial.print(",");
+    Serial.println(THROTTLE_VALUE);
     ledcWrite(ledChannel, THROTTLE_VALUE);
 
   } else {
