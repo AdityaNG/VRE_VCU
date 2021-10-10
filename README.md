@@ -5,16 +5,45 @@
 ## TODO: Autonomous RC Car
 
 1. Wiring Harness Simplification - Disconnector between top and bottom 
-2. Wiring Harness Simplification - All wires running along chassis, minimum length`
+2. Wiring Harness Simplification - All wires running along chassis, minimum length
 3. Steering Servo not responding correctly - likely due to ESP32 PWM issue. Resolve by simplifying code or using an intermediate Arduino /  PWM generator.
-4. Rear motor and gearbox is slipping, disassemble t
+4. Rear motor and gearbox is slipping, disassemble it
 5. Current Limits - The BTS7960 Motor Driver has current sense leads which have been read into `CURRENT_DRAW_L` and `CURRENT_DRAW_R` ranging (0, 4095). Understand what the value represents and convert it into current in Amps
 6. Battery Voltage Sensing and enforcing voltage limits by opening shutdown relay 
-7. Wheel Speed sensing - build and test sensor + code to measure wheel speed encoder count
-8. GPS - The module does not send location properly, although it does send the correct time. Debug and fix
-9. Data Compression - Comp->Vehicle data is compressed to 4 bytes ;  similarly compress the Vehicle->Comp data (right now it a comma seperated string)
-10. Live Graphing - Vehicle->Comp data to be graphed on screen
+7. GPS - The module does not send location properly, although it does send the correct time. Debug and fix
+8. Data Compression - Comp->Vehicle data is compressed to 4 bytes ;  similarly compress the Vehicle->Comp data (right now it a comma seperated string)
+9. Wheel Speed sensing - build and test sensor + code to measure wheel speed encoder count
 
+## Data format
+
+Incoming data fromat is 4 bytes of the following format
+
+```python
+b0 = ord(';')
+b1 =    self.shutdown<<7        ^ 
+        self.parity<<6          ^ 
+        self.log<<5             ^ 
+        self.regen<<4           ^ 
+        self.left<<1            ^ 
+        self.reverse<<0
+b2 = self.throttle
+b3 = self.steering
+
+bytearray([b0, b1, b2, b3])
+```
+
+Outgoing data format is of the following format
+
+```python
+# TODO :
+"""
+GPS
+ACCEL_GYRO
+RTC
+CURRENT
+VOLTAGE
+"""
+```
 
 ## TODO: Software 
 1. Data logging with dates
