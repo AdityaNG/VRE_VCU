@@ -4,15 +4,21 @@
 
 ## TODO: Autonomous RC Car
 
-1. Wiring Harness Simplification - Disconnector between top and bottom 
-2. Wiring Harness Simplification - All wires running along chassis, minimum length
-3. Steering Servo not responding correctly - likely due to ESP32 PWM issue. Resolve by simplifying code or using an intermediate Arduino /  PWM generator.
-4. Rear motor and gearbox is slipping, disassemble it
-5. Current Limits - The BTS7960 Motor Driver has current sense leads which have been read into `CURRENT_DRAW_L` and `CURRENT_DRAW_R` ranging (0, 4095). Understand what the value represents and convert it into current in Amps
-6. Battery Voltage Sensing and enforcing voltage limits by opening shutdown relay 
-7. GPS - The module does not send location properly, although it does send the correct time. Debug and fix
-8. Data Compression - Comp->Vehicle data is compressed to 4 bytes ;  similarly compress the Vehicle->Comp data (right now it a comma seperated string)
-9. Wheel Speed sensing - build and test sensor + code to measure wheel speed encoder count
+1. Rear motor and gearbox is slipping, disassemble it
+2. Wiring Harness - Disconnector between top and bottom units
+3. Wiring Harness - All wires running along chassis, minimum length
+4. Tractive System LEDs strip installation
+5. Steering Servo not responding correctly - likely due to ESP32 PWM issue. Resolve by simplifying code or using an intermediate Arduino /  PWM generator.
+6. Power Calculation (watts) - look at ESP32, Motor+Controller, relays, GPS, IMU, etc. power consumption and add it up. Divide 111 watt by power consumption to estimate runtime in hours.
+7. Current Limits - The BTS7960 Motor Driver has current sense leads which have been read into `CURRENT_DRAW_L` and `CURRENT_DRAW_R` ranging (0, 4095). Understand what the value represents and convert it into current in Amps
+8. Battery Voltage Sensing and enforcing voltage limits by opening shutdown relay 
+9. GPS - The module does not send location properly, although it does send the correct time. Debug and fix
+10. Data Compression - Comp->Vehicle data is compressed to 4 bytes ;  similarly compress the Vehicle->Comp data (right now it a comma seperated string)
+11. (Optional) Redesign PCB
+12. (Optional) Wiring Harness - High current paths (motor lines, motor controller lines) to have thicker wires
+13. (Optional) Remaining Runtime Estimation - Look at current battery voltage, average current draw over the last X minutes and compute average power (watt) over the last X seconds. With with the average power and known capacity of the battery (10 Ah), compute an estimated remaining runtime in minutes
+14. (Optional) Range Estimation - Look at average energy consumed per distance travelled (units watt-hour per meter) draw over the last X minutes and with the known capacity of the battery (10 Ah), compute an estimated remaining runtime in minutes and remaining range in meters
+15. (Optional) Wheel Speed sensing - build and test sensor + code to measure wheel speed encoder count
 
 ## Data format
 
