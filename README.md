@@ -41,13 +41,27 @@ bytearray([b0, b1, b2, b3])
 Outgoing data format is of the following format
 
 ```python
-# TODO :
+# TODO : Compress the following into binary format similar to 'incoming data format'
 """
 GPS
-ACCEL_GYRO
-RTC
-CURRENT
-VOLTAGE
+	LAT
+	LON
+	TIME
+
+GYRO
+ACCEL
+	VELOCITY	# Integrate ACCEL
+	POSITION	# Integrate POSITION (Only since last GPS Ping)
+
+THROTTLE		# Negative throttle produces braking force
+STEERING
+REGEN			# Regenerative Braking
+
+CURRENT_LIMIT		# Set current limit
+SHUTDOWN_STAT		# Shutdown relay status
+
+BAT_VOLTAGE		# 11.1v Lipo battery voltage
+MOT_CURRENT		# Current Draw from motor
 """
 ```
 
