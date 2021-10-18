@@ -43,7 +43,8 @@ TinyGPSPlus gps;
 // The serial connection to the GPS device
 SoftwareSerial ss(RXPin, TXPin);
 
-bool PRINT_LOGS = false;
+//bool PRINT_LOGS = false;
+volatile bool PRINT_LOGS = true;
 
 QueueHandle_t queue;
 int queueSize = 1;
@@ -268,7 +269,7 @@ String LAST_FAULT_MESSAGE = "";
 void main_loop(void *pvParameters) {
   int last_recieved_command = 0;
   while (true) {
-
+    //Serial.println("Main loop");
     if (millis() - last_log_print >= 3000) {
       //PRINT_LOGS
       if (PRINT_LOGS) {
@@ -366,6 +367,12 @@ void ESP_BT_Commands(void *pvParameters) {
       // start
       startup_TS();
       ts_stat = true;
+    }
+
+    if (lg) {
+      PRINT_LOGS = true;
+    } else {
+      PRINT_LOGS = false;  
     }
 
     throttle(th, regen);
