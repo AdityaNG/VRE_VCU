@@ -46,8 +46,6 @@ SoftwareSerial ss(RXPin, TXPin);
 //bool PRINT_LOGS = false;
 volatile bool PRINT_LOGS = true;
 
-QueueHandle_t queue;
-int queueSize = 1;
 
 // Pin declaration 
 const uint8_t EN_L = 33;
@@ -100,24 +98,23 @@ void steering(int steering_angle);
 void throttle(int th, int brk);
 void throttle(int th);
 
-
 void emergency_stop();
 void startup_TS();
 
-void ESP_BT_Commands(void *pvParameters);
+void ESP_BT_Commands();
 
-void ESP_BT_Commands_OLD(void *pvParameters);
 static void smartDelay(unsigned long ms);
 
 static void printInt(unsigned long val, bool valid, int len);
 
 static void printDateTime(TinyGPSDate &d, TinyGPSTime &t);
+void printFloat(float val, bool valid, int len, int prec);
 
 void test_steering();
 /////////////////////////////////////////
 
 
-void main_loop(void *pvParameters);
+void main_loop();
 
 void setup() {
   // Serial Communication
@@ -229,53 +226,41 @@ void setup() {
 
   // Init done
   play_tone(boot_tone, BUZZER_PIN);
-
-  queue = xQueueCreate( queueSize, sizeof( int ) );
-
-  if(queue == NULL){
-    Serial.println("Error creating the queue");
-  }
-  
-  // Now set up two tasks to run independently.
-  xTaskCreatePinnedToCore(
-    ESP_BT_Commands
-    ,  "ESP_BT_Commands"   // A name just for humans
-    ,  10240  // This stack size can be checked & adjusted by reading the Stack Highwater
-    ,  NULL
-    ,  2  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
-    ,  NULL 
-    ,  ARDUINO_RUNNING_CORE);
-
-  xTaskCreatePinnedToCore(
-    main_loop
-    ,  "main_loop"
-    ,  10240  // Stack size
-    ,  NULL
-    ,  1  // Priority
-    ,  NULL 
-    ,  ARDUINO_RUNNING_CORE);
-
-  
 }
 
 void loop()
 {
-  // Empty. Things are done in Tasks.
+  main_loop();
+  ESP_BT_Commands();
 }
 
 bool started = false;
 int last_log_print = 0, last_sesor_check = 0;
 String LAST_FAULT_MESSAGE = "";
-void main_loop(void *pvParameters) {
+void main_loop() {
+  smartDelay(50); // Keep the gps object fed
   int last_recieved_command = 0;
-  while (true) {
+  
     //Serial.println("Main loop");
     if (millis() - last_log_print >= 3000) {
       //PRINT_LOGS
       if (PRINT_LOGS) {
         //print_time();
+        
+        //printDateTime(gps.date, gps.time);
+        //log_current_frame_serial();
+
+        printInt(gps.satellites.value(), gps.satellites.isValid(), 5);
+        printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 6, 1);
+        printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
+        printFloat(gps.location.lng(), gps.location.isValid(), 12, 6);
+        printInt(gps.location.age(), gps.location.isValid(), 5);
         printDateTime(gps.date, gps.time);
-        log_current_frame_serial();
+        printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
+        printFloat(gps.course.deg(), gps.course.isValid(), 7, 2);
+        printFloat(gps.speed.kmph(), gps.speed.isValid(), 6, 2);
+
+        Serial.println();
       }
       last_log_print = millis();
     }
@@ -316,23 +301,18 @@ void main_loop(void *pvParameters) {
     */
 
     //delay(500);
-  }
 }
 
-void ESP_BT_Commands(void *pvParameters) {
+bool ts_stat = false;
+void ESP_BT_Commands() {
   int last_recieved_command = 0;  
-  (void) pvParameters;
-
-  bool ts_stat = false;
-
-  while (true) {
     if (!ESP_BT.available())
-      continue;
+      return;
     char incoming = ESP_BT.read(); //Read what we recevive
     if (incoming!=';')
-      continue;
+      return;
     if (!ESP_BT.available())
-      continue;
+      return;
     
     int b1, th, st;
 
@@ -355,7 +335,7 @@ void ESP_BT_Commands(void *pvParameters) {
     st = st * ((lft)? 1: -1);
     
     if (p!=0 || z1!=0 || z2!=0)
-      continue;
+      return;
 
     if (ts_stat && sd) {
       //Shutdown 
@@ -378,10 +358,8 @@ void ESP_BT_Commands(void *pvParameters) {
     throttle(th, regen);
     steering(st);
     
-    //last_recieved_command = millis();
-    //xQueueSend(queue, &last_recieved_command, portMAX_DELAY);
-    
-  }
+    last_recieved_command = millis();
+    ESP_BT.flush();
 }
 
 /////// helpers
@@ -503,84 +481,21 @@ void throttle(int th) {
   throttle(th, false);
 }
 
+bool TS_STATUS = true; // Assume TS is active at boot
+
 void emergency_stop() {
+  if (!TS_STATUS) return; // If TS already disengaged, do nothing
   digitalWrite(SHUTDOWN_RELAY, LOW);
   play_tone(stop_tone, BUZZER_PIN);
+  TS_STATUS = false;
 }
 
 
 void startup_TS() {
+  if (TS_STATUS) return; // If TS already engaged, do nothing
   digitalWrite(SHUTDOWN_RELAY, HIGH);
   play_tone(start_tone, BUZZER_PIN);
-}
-
-void ESP_BT_Commands_OLD(void *pvParameters) {
-  int last_recieved_command = 0;  
-  (void) pvParameters;
-
-  while (true) {
-    if (!ESP_BT.available())
-      continue;
-    char incoming = ESP_BT.read(); //Read what we recevive
-    if (incoming!=';')
-      continue;
-    if (!ESP_BT.available())
-      continue;
-    
-    String command = "";
-    
-    incoming = ESP_BT.read(); //Read what we recevive
-    while (ESP_BT.available() && incoming!=';') //Check if we receive anything from Bluetooth
-    {
-      command += incoming;
-      incoming = ESP_BT.read(); //Read what we recevive
-    }
-    last_recieved_command = millis();
-    xQueueSend(queue, &last_recieved_command, portMAX_DELAY);
-    if (command != "") {
-      //ESP_BT.println("Got : " + command);
-      if (command == "start") {
-          ESP_BT.println("TS start");
-          Serial.println("TS start");
-          startup_TS();
-      } else if (command == "stop") {
-          ESP_BT.println("TS stop");
-          Serial.println("TS stop");
-          emergency_stop();
-      } else if(command.indexOf("CURRENT_LIMIT")>=0 && command.length()==18) {
-        // Format CURRENT_LIMIT 2000;
-        CURRENT_LIMIT = (float) command.substring(14,18).toInt();
-        log_current_frame_serial();
-      } else if (command.indexOf("actuate")>=0 && command.length()==17) {
-        // Format >>actuate +050 -000;
-        // Format >>actuate +THR -STR;
-        throttle_val = command.substring(9,12).toInt() * ((command[8]=='-')? -1 : +1);
-        steering_val = command.substring(14,17).toInt() * ((command[13]=='-')? -1 : +1);
-        throttle(throttle_val);
-        steering(steering_val);
-        
-        //ESP_BT.println(String(THR) + ":" + String(STR));
-        //Serial.println(String(throttle_val) + ":" + String(steering_val));
-        //log_current_frame_serial();
-      } else if (command == "log_enable") {
-        PRINT_LOGS = true;
-      } else if (command == "log_disable") {
-        PRINT_LOGS = false;
-      } else if (command == "accel") {
-        // TODO : Async ESP_BT print
-        ESP_BT.print("a/g:\t");
-          ESP_BT.print(ax); ESP_BT.print("\t");
-          ESP_BT.print(ay); ESP_BT.print("\t");
-          ESP_BT.print(az); ESP_BT.print("\t");
-          ESP_BT.print(gx); ESP_BT.print("\t");
-          ESP_BT.print(gy); ESP_BT.print("\t");
-          ESP_BT.println(gz);
-      } else {
-        ESP_BT.println("WARN unknown_command ");
-        Serial.println("WARN unknown_command " + command);
-      }
-    }
-  }
+  TS_STATUS = true;
 }
 
 // This custom version of delay() ensures that the gps object
@@ -634,6 +549,25 @@ static void printDateTime(TinyGPSDate &d, TinyGPSTime &t)
   }
 
   printInt(d.age(), d.isValid(), 5);
+  smartDelay(0);
+}
+void printFloat(float val, bool valid, int len, int prec)
+{
+  if (!valid)
+  {
+    while (len-- > 1)
+      Serial.print('*');
+    Serial.print(' ');
+  }
+  else
+  {
+    Serial.print(val, prec);
+    int vi = abs((int)val);
+    int flen = prec + (val < 0.0 ? 2 : 1); // . and -
+    flen += vi >= 1000 ? 4 : vi >= 100 ? 3 : vi >= 10 ? 2 : 1;
+    for (int i=flen; i<len; ++i)
+      Serial.print(' ');
+  }
   smartDelay(0);
 }
 
