@@ -96,6 +96,10 @@ The strapping pins must not be pulled high/low on boot. The ESP32 chip has the f
 
 ## Libraries used :
 
+- ["CircularBuffer"]
+- ["EspSoftwareSerial"]
+- ["Arduino-BTS7960"](https://github.com/AdityaNG/Arduino-BTS7960)
+- ["ESP32_AnalogWrite"](//github.com/AdityaNG/ESP32_AnalogWrite)
 - ["ESP32CAN.h"](https://www.arduino.cc/reference/en/libraries/can/) CAN
 - ["Wire.h"](https://www.arduino.cc/en/reference/wire) Requirement for `SPI.h`
 - ["I2Cdev.h"](http://github.com/jrowberg/i2cdevlib) IIC to talk to MPU6050 and DS3231 (RTC Clock)

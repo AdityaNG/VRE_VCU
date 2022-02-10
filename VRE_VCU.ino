@@ -5,7 +5,7 @@
 #endif
 
 #include "Wire.h"
-#include "I2Cdev.h"
+#include "./I2Cdev.h"
 #include "./DS1307.h"
 #include "./MPU6050.h"
 #include "./BT_helper.h"
@@ -18,13 +18,12 @@
 #include "BTS7960.h"
 #include "sounddata.h"
 #include <Arduino.h>
-#include <ESP32CAN.h>
-#include <CAN_config.h>
 #include <ESP32Servo.h>
 
 #include "BluetoothSerial.h"
 
-#include <TinyGPS++.h>
+//#include <TinyGPS++.h>
+#include <TinyGPSPlus.h>
 #include <SoftwareSerial.h>
 
 #include <CircularBuffer.h>
